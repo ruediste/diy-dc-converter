@@ -2,10 +2,14 @@ package com.github.ruediste.digitalSmpsSim.simulation;
 
 import com.github.ruediste.digitalSmpsSim.quantity.Quantity;
 
-public class ElementInput<T extends Quantity> implements Plottable {
+abstract public class ElementInput<T extends Quantity> implements Plottable {
     private ElementOutput<? extends T> output;
 
-    public T value;
+    private T value;
+
+    public T get() {
+        return value;
+    }
 
     public ElementInput(CircuitElement element) {
         element.inputs.add(this);

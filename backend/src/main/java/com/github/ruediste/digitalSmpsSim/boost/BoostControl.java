@@ -2,6 +2,7 @@ package com.github.ruediste.digitalSmpsSim.boost;
 
 import com.github.ruediste.digitalSmpsSim.quantity.DigitalValue;
 import com.github.ruediste.digitalSmpsSim.quantity.Duration;
+import com.github.ruediste.digitalSmpsSim.quantity.Fraction;
 import com.github.ruediste.digitalSmpsSim.quantity.Instant;
 import com.github.ruediste.digitalSmpsSim.quantity.Voltage;
 import com.github.ruediste.digitalSmpsSim.simulation.CircuitElement;
@@ -11,6 +12,8 @@ import com.github.ruediste.digitalSmpsSim.simulation.ElementOutput;
 public class BoostControl extends CircuitElement {
 
     public ElementOutput<DigitalValue> switchOut = new ElementOutput<>(this) {
+    };
+    public ElementOutput<Fraction> dutyOut = new ElementOutput<>(this) {
     };
 
     public ElementInput<Voltage> outputVoltage = new ElementInput<>(this) {

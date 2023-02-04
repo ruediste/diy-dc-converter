@@ -11,14 +11,15 @@ import com.github.ruediste.digitalSmpsSim.quantity.HasUnit;
 import com.github.ruediste.digitalSmpsSim.quantity.Instant;
 import com.github.ruediste.digitalSmpsSim.quantity.SiPrefix;
 import com.github.ruediste.digitalSmpsSim.quantity.SiPrefixRest;
-import com.github.ruediste.digitalSmpsSim.quantity.Unit;
 import com.github.ruediste.digitalSmpsSim.quantity.SiPrefixRest.SiPrefixPMod;
+import com.github.ruediste.digitalSmpsSim.quantity.Unit;
 import com.google.common.reflect.TypeToken;
 
 public class Plot {
     public Duration samplePeriod;
     public Instant start;
     public Instant end;
+    public String title;
 
     public SiPrefixPMod timePrefix;
 

@@ -2,7 +2,8 @@ package com.github.ruediste.digitalSmpsSim.boost;
 
 import com.github.ruediste.digitalSmpsSim.quantity.Current;
 import com.github.ruediste.digitalSmpsSim.quantity.DigitalValue;
-import com.github.ruediste.digitalSmpsSim.quantity.*;
+import com.github.ruediste.digitalSmpsSim.quantity.Duration;
+import com.github.ruediste.digitalSmpsSim.quantity.Instant;
 import com.github.ruediste.digitalSmpsSim.quantity.Voltage;
 import com.github.ruediste.digitalSmpsSim.simulation.CircuitElement;
 import com.github.ruediste.digitalSmpsSim.simulation.ElementInput;
@@ -39,10 +40,10 @@ public class BoostPower extends CircuitElement {
     }
 
     private Voltage inductorVoltage() {
-        if (switchIn.value.isHigh()) {
-            return vIn.value;
+        if (switchIn.get().isHigh()) {
+            return vIn.get();
         } else {
-            return vIn.value.minus(vCap);
+            return vIn.get().minus(vCap);
         }
     }
 
@@ -58,8 +59,14 @@ public class BoostPower extends CircuitElement {
         // max: simulate diode: never let current flow backwards
         iL = iL.add(dIL).max(0);
 
-        Current iC = iL.add(iLOld).scale(0.5) // average inductor current
-                .minus(iLoad.value);
+        Current iC;
+        if (switchIn.get().isHigh())
+            iC = Current.of(0);
+        else
+            iC = iL.add(iLOld).scale(0.5); // average inductor current
+
+        iC = iC.minus(iLoad.get()); // no matter of the switch position, the load current is always drawn from the
+                                    // capacitor
 
         // I=C*dv/dt; dv=I*dt/C
         vCap = vCap.add(iC.value() * stepDuration.value() / capacitance);

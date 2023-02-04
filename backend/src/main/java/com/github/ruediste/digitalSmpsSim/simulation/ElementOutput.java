@@ -2,7 +2,7 @@ package com.github.ruediste.digitalSmpsSim.simulation;
 
 import com.github.ruediste.digitalSmpsSim.quantity.Quantity;
 
-public class ElementOutput<T extends Quantity> implements Plottable {
+public abstract class ElementOutput<T extends Quantity> implements Plottable {
 
     T value;
 

@@ -30,7 +30,7 @@ public class Load extends CircuitElement {
 
     @Override
     public void run(Instant stepStart, Instant stepEnd, Duration stepDuration) {
-        current.set(voltage.value.divide(resistance));
+        current.set(voltage.get().divide(resistance));
     }
 
 }

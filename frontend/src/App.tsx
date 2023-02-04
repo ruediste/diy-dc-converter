@@ -8,6 +8,7 @@ import {
   Tooltip,
   Label,
   ResponsiveContainer,
+  Brush,
 } from "recharts";
 import { useEffect, useRef, useState } from "react";
 import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
@@ -28,6 +29,7 @@ interface PlotValues {
 }
 
 interface Plot {
+  title: string;
   start: number;
   end: number;
   samplePeriod: number | null;
@@ -54,6 +56,68 @@ function paletteColor(idx: number) {
   return palette[idx % palette.length];
 }
 
+function DisplayPlot({
+  plot,
+  height,
+}: {
+  plot: Plot;
+  height?: string | number;
+}) {
+  const timeFormatter = (x: number) =>
+    (x / plot.timePrefix.multiplier).toFixed(3);
+  return (
+    <ResponsiveContainer height={height}>
+      <LineChart
+        data={plot.values}
+
+        // syncId="anyId"
+      >
+        {plot.series.map((series, idx) => (
+          <Line
+            key={series.name}
+            type={series.stepAfter ? "stepAfter" : "linear"}
+            dataKey={(x) => x.values[idx]}
+            name={series.name + "[" + series.unitSymbol + "]"}
+            stroke={paletteColor(idx)}
+            fill={paletteColor(idx)}
+            yAxisId={series.yAxisIndex}
+            strokeWidth={3}
+            animationDuration={0}
+          />
+        ))}
+        <CartesianGrid stroke="#ccc" />
+        <XAxis
+          dataKey="time"
+          type="number"
+          tickFormatter={timeFormatter}
+          unit={plot.timePrefix.symbol + "s"}
+        />
+        {plot.axes.map((axis) => (
+          <YAxis
+            key={axis.index}
+            yAxisId={axis.index}
+            label={<Label value={axis.unitSymbol} position="insideBottom" />}
+            orientation={axis.isRight ? "right" : "left"}
+          />
+        ))}
+        <Tooltip
+          labelFormatter={(x) =>
+            timeFormatter(x) + plot.timePrefix.symbol + "s"
+          }
+          formatter={(value: any, name, item, index) => {
+            const siPrefix = getSiPrefix(value);
+            const series = plot.series[index];
+            return (
+              (value / siPrefix.multiplier).toFixed(3) +
+              siPrefix?.symbol +
+              series.unitSymbol
+            );
+          }}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+}
 function App() {
   const [plots, setPlots] = useState<Plot[]>();
   const load = useRef<() => void>();
@@ -86,63 +150,27 @@ function App() {
     }
   );
 
+  const [zoomedIdx, setZoomedIdx] = useState<number>();
+
   if (plots === undefined) return <>Loading...</>;
   return (
     <>
-      <button onClick={() => load.current!()}>Refresh</button>
-      {plots.map((plot, idx) => {
-        const timeFormatter = (x: number) =>
-          (x / plot.timePrefix.multiplier).toFixed(3);
-        return (
-          <ResponsiveContainer key={idx} height={500}>
-            <LineChart data={plot.values} syncId="anyId">
-              {plot.series.map((series, idx) => (
-                <Line
-                  key={series.name}
-                  type={series.stepAfter ? "stepAfter" : "linear"}
-                  dataKey={(x) => x.values[idx]}
-                  name={series.name + "[" + series.unitSymbol + "]"}
-                  stroke={paletteColor(idx)}
-                  fill={paletteColor(idx)}
-                  yAxisId={series.yAxisIndex}
-                  strokeWidth={3}
-                />
-              ))}
-              <CartesianGrid stroke="#ccc" />
-              <XAxis
-                dataKey="time"
-                type="number"
-                tickFormatter={timeFormatter}
-                unit={plot.timePrefix.symbol + "s"}
-              />
-              {plot.axes.map((axis) => (
-                <YAxis
-                  key={axis.index}
-                  yAxisId={axis.index}
-                  label={
-                    <Label value={axis.unitSymbol} position="insideBottom" />
-                  }
-                  orientation={axis.isRight ? "right" : "left"}
-                />
-              ))}
-              <Tooltip
-                labelFormatter={(x) =>
-                  timeFormatter(x) + plot.timePrefix.symbol + "s"
-                }
-                formatter={(value: any, name, item, index) => {
-                  const siPrefix = getSiPrefix(value);
-                  const series = plot.series[index];
-                  return (
-                    (value / siPrefix.multiplier).toFixed(3) +
-                    siPrefix?.symbol +
-                    series.unitSymbol
-                  );
-                }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        );
-      })}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
+        {plots.map((plot, idx) => (
+          <div onClick={() => setZoomedIdx(idx)}>
+            <h2>{plot.title}</h2>
+            <DisplayPlot key={idx} plot={plot} height={400} />
+          </div>
+        ))}
+      </div>
+      {zoomedIdx === undefined ? null : (
+        <div className="fullScreen" onClick={() => setZoomedIdx(undefined)}>
+          <h2>{plots[zoomedIdx].title}</h2>
+          <div>
+            <DisplayPlot plot={plots[zoomedIdx]} />
+          </div>
+        </div>
+      )}
     </>
   );
 }
