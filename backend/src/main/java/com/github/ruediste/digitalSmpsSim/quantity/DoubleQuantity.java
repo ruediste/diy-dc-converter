@@ -64,4 +64,7 @@ public abstract class DoubleQuantity<TSelf extends DoubleQuantity<TSelf>> extend
         return SiPrefix.format(value, getClass().getAnnotation(HasUnit.class).value().symbol);
     }
 
+    public int compareTo(TSelf other) {
+        return Double.compare(value, other.value());
+    }
 }

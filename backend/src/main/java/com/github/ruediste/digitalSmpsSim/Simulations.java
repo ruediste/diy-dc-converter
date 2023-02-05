@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import com.github.ruediste.digitalSmpsSim.PlotRest.PlotGroup;
 import com.github.ruediste.digitalSmpsSim.boost.BoostDesign;
 import com.github.ruediste.digitalSmpsSim.quantity.Current;
 import com.github.ruediste.digitalSmpsSim.quantity.Instant;
@@ -21,7 +22,7 @@ public class Simulations {
 
     Logger log = LoggerFactory.getLogger(Simulations.class);
 
-    List<Plot> plots = new ArrayList<>();
+    List<PlotGroup> plotGroups = new ArrayList<>();
 
     private enum Event {
         STEADY,
@@ -39,12 +40,16 @@ public class Simulations {
         List<Current> iOuts = List.of(0.01, 0.1, 1., 2.).stream().map(v -> Current.of(v)).toList();
 
         var sim = new Simulator();
-        for (var event : Event.values())
+        for (var event : Event.values()) {
+            plotGroup(event.toString());
             for (var vOut : vOuts)
                 for (var iOut : iOuts) {
+                    // if (event != Event.STEADY || vOut.value() != 10 || iOut.value() != 1)
+                    // continue;
                     var circuit = design.circuit();
                     circuit.load.resistance = vOut.divide(iOut);
                     circuit.power.vCap = vOut;
+                    circuit.control.targetVoltage = vOut;
 
                     var iLAvg = Current.of(iOut.value() * vOut.value() / design.inputVoltage.value());
                     // Vo= Vin/(1-D); 1-D=Vin/Vo; D-1=-Vin/Vo; D=1-Vin/Vo;
@@ -66,9 +71,10 @@ public class Simulations {
                         circuit.control.duty = tOn / design.switchingPeriod().value();
                     }
 
-                    var plot = plot(event + " " + vOut + " - " + iOut)
+                    var plot = plot(vOut + " - " + iOut)
                             .add("Vout", circuit.power.vOut)
-                            .add("IL", circuit.power.ilOut);
+                            .add("IL", circuit.power.ilOut)
+                            .add("d", circuit.control.dutyOut);
                     switch (event) {
                         case INPUT_DROP:
                             circuit.source.voltage.set(Instant.of(design.switchingPeriod().value() * 3),
@@ -83,18 +89,23 @@ public class Simulations {
 
                     }
 
-                    sim.simulate(circuit, circuit.switchingPeriod() * 80,
+                    sim.simulate(circuit, circuit.switchingPeriod() * 40,
                             plot);
 
                 }
+        }
 
         log.info("Simulations complete");
+    }
+
+    private void plotGroup(String label) {
+        this.plotGroups.add(new PlotGroup(label));
     }
 
     private Plot plot(String title) {
         var plot = new Plot();
         plot.title = title;
-        plots.add(plot);
+        this.plotGroups.get(this.plotGroups.size() - 1).plots.add(plot);
         return plot;
     }
 }

@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
   Brush,
 } from "recharts";
-import { useEffect, useRef, useState } from "react";
+import { Children, ReactNode, useEffect, useRef, useState } from "react";
 import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket";
 import { getSiPrefix, SiPrefix, siPrefixes } from "./siPrefix";
 import { time } from "console";
@@ -39,6 +39,11 @@ interface Plot {
   values: PlotValues[];
 
   axes: { index: number; unit: string; unitSymbol: string; isRight: boolean }[];
+}
+
+interface PlotGroup {
+  label: string;
+  plots: Plot[];
 }
 
 const palette = [
@@ -118,14 +123,70 @@ function DisplayPlot({
     </ResponsiveContainer>
   );
 }
+
+function Tabs({
+  children,
+}: {
+  children: { label: string; element: ReactNode }[];
+}) {
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const childrenLength = children.length;
+  useEffect(() => {
+    if (selectedIndex >= childrenLength - 1) setSelectedIndex(0);
+  }, [childrenLength]);
+
+  return (
+    <div>
+      <ul className="nav nav-tabs">
+        {children.map((child, idx) => (
+          <li className="nav-item" onClick={() => setSelectedIndex(idx)}>
+            <a
+              key={idx}
+              className={idx === selectedIndex ? "nav-link active" : "nav-link"}
+              aria-current="page"
+              href="#"
+            >
+              {child.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+      {childrenLength < 1 ? null : children[selectedIndex].element}
+    </div>
+  );
+}
+
+function DisplayPlots({ plots }: { plots: Plot[] }) {
+  const [zoomedIdx, setZoomedIdx] = useState<number>();
+  return (
+    <>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
+        {plots.map((plot, idx) => (
+          <div onClick={() => setZoomedIdx(idx)}>
+            <h2>{plot.title}</h2>
+            <DisplayPlot key={idx} plot={plot} height={400} />
+          </div>
+        ))}
+      </div>
+      {zoomedIdx === undefined ? null : (
+        <div className="fullScreen" onClick={() => setZoomedIdx(undefined)}>
+          <h2>{plots[zoomedIdx].title}</h2>
+          <div>
+            <DisplayPlot plot={plots[zoomedIdx]} />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
 function App() {
-  const [plots, setPlots] = useState<Plot[]>();
+  const [plotGroups, setPlotGroups] = useState<PlotGroup[]>();
   const load = useRef<() => void>();
   useEffect(() => {
     const doLoad = () =>
       fetch("/api/plot")
         .then((response) => response.json())
-        .then((p) => setPlots(p));
+        .then((p) => setPlotGroups(p));
     load.current = doLoad;
     doLoad();
   }, []);
@@ -150,28 +211,14 @@ function App() {
     }
   );
 
-  const [zoomedIdx, setZoomedIdx] = useState<number>();
-
-  if (plots === undefined) return <>Loading...</>;
+  if (plotGroups === undefined) return <>Loading...</>;
   return (
-    <>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
-        {plots.map((plot, idx) => (
-          <div onClick={() => setZoomedIdx(idx)}>
-            <h2>{plot.title}</h2>
-            <DisplayPlot key={idx} plot={plot} height={400} />
-          </div>
-        ))}
-      </div>
-      {zoomedIdx === undefined ? null : (
-        <div className="fullScreen" onClick={() => setZoomedIdx(undefined)}>
-          <h2>{plots[zoomedIdx].title}</h2>
-          <div>
-            <DisplayPlot plot={plots[zoomedIdx]} />
-          </div>
-        </div>
-      )}
-    </>
+    <Tabs>
+      {plotGroups.map((plotGroup) => ({
+        label: plotGroup.label,
+        element: <DisplayPlots plots={plotGroup.plots} />,
+      }))}
+    </Tabs>
   );
 }
 

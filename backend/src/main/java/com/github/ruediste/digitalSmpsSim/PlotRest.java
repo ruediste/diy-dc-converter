@@ -1,5 +1,6 @@
 package com.github.ruediste.digitalSmpsSim;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -20,8 +21,18 @@ public class PlotRest {
     @Inject
     Simulations simulations;
 
+    public static class PlotGroup {
+        public String label;
+        public List<Plot> plots = new ArrayList<>();
+
+        public PlotGroup(String label) {
+            this.label = label;
+        }
+
+    }
+
     @GET
-    public List<Plot> getPlots() {
-        return simulations.plots;
+    public List<PlotGroup> getPlots() {
+        return simulations.plotGroups;
     }
 }
