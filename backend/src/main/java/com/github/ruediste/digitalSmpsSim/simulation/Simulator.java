@@ -12,18 +12,26 @@ public class Simulator {
         simulate(circuit, finalTime, List.of(plots));
     }
 
-    private void fillPlots(Instant time, List<Plot> plots) {
+    private void fillPlots(Instant time, List<Plot> plots, boolean addPoint) {
         for (var plot : plots) {
             if (plot.start != null && time.value() < plot.start.value())
                 continue;
             if (plot.end != null && time.value() > plot.end.value())
                 continue;
-            var values = new Plot.PlotValues();
-            values.time = time;
             for (var series : plot.series) {
-                values.values.add(series.valueSupplier.get());
+                series.count++;
+                series.sum += series.valueSupplier.get();
             }
-            plot.values.add(values);
+            if (addPoint) {
+                var values = new Plot.PlotValues();
+                values.time = time;
+                for (var series : plot.series) {
+                    values.values.add(series.sum / series.count);
+                    series.sum = 0;
+                    series.count = 0;
+                }
+                plot.values.add(values);
+            }
         }
     }
 
@@ -32,7 +40,9 @@ public class Simulator {
         circuit.elements.forEach(e -> e.initialize());
         circuit.propagateSignals();
         Instant time = Instant.of(0);
-        fillPlots(time, plots);
+        fillPlots(time, plots, true);
+        double plotPeriod = finalTime / 200;
+        double nextPlot = plotPeriod;
         long stepCount = 0;
         while (time.value() < finalTime) {
             Instant stepEnd = null;
@@ -56,7 +66,13 @@ public class Simulator {
 
             circuit.propagateSignals();
             time = stepEnd;
-            fillPlots(stepEnd, plots);
+            {
+                boolean addPoint = time.value() > nextPlot;
+                fillPlots(stepEnd, plots, addPoint);
+                if (addPoint) {
+                    nextPlot = time.value() + plotPeriod;
+                }
+            }
             stepCount++;
         }
 

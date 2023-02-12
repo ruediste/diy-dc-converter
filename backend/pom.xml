@@ -19,6 +19,11 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-jersey</artifactId>
 		</dependency>
+		<dependency>
+			<groupId>com.github.psambit9791</groupId>
+			<artifactId>jdsp</artifactId>
+			<version>2.0.0</version>
+		</dependency>
 
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

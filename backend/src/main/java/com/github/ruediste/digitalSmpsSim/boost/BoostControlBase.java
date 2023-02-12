@@ -9,7 +9,7 @@ import com.github.ruediste.digitalSmpsSim.simulation.CircuitElement;
 import com.github.ruediste.digitalSmpsSim.simulation.ElementInput;
 import com.github.ruediste.digitalSmpsSim.simulation.ElementOutput;
 
-public class BoostControl extends CircuitElement {
+public abstract class BoostControlBase extends CircuitElement {
 
     public ElementOutput<DigitalValue> switchOut = new ElementOutput<>(this) {
     };
@@ -19,13 +19,13 @@ public class BoostControl extends CircuitElement {
     public ElementInput<Voltage> outputVoltage = new ElementInput<>(this) {
     };
 
-    private BoostCircuit circuit;
+    protected final BoostCircuit circuit;
 
     public double duty = 0.5;
 
     public Voltage targetVoltage;
 
-    protected BoostControl(BoostCircuit circuit) {
+    protected BoostControlBase(BoostCircuit circuit) {
         super(circuit);
         this.circuit = circuit;
     }
@@ -45,9 +45,9 @@ public class BoostControl extends CircuitElement {
     }
 
     Phase phase;
-    Instant lastCycleStart;
+    protected Instant lastCycleStart;
     Instant nextPhaseChange;
-    long count;
+    protected long count;
 
     @Override
     public Instant stepEndTime(Instant stepStart) {
@@ -61,6 +61,8 @@ public class BoostControl extends CircuitElement {
         switchOut.set(DigitalValue.of(phase == Phase.SWITCH_ON));
         dutyOut.set(Fraction.of(duty));
     }
+
+    protected abstract void updateDuty(Instant currentTime);
 
     private void moveToTime(Instant currentTime) {
         if (currentTime.compareTo(nextPhaseChange) >= 0) {
@@ -76,13 +78,7 @@ public class BoostControl extends CircuitElement {
                     count++;
                     phase = Phase.SWITCH_ON;
 
-                    if (count % 5 == 0) {
-                        if (outputVoltage.get().value() < targetVoltage.value()) {
-                            duty += 1e-2;
-                        } else
-                            duty -= 1e-2;
-                        duty = Math.max(0.01, Math.min(duty, 0.99));
-                    }
+                    updateDuty(currentTime);
 
                     nextPhaseChange = lastCycleStart.add(circuit.switchingPeriod() * duty);
 

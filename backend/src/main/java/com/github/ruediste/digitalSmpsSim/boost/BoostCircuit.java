@@ -1,11 +1,14 @@
 package com.github.ruediste.digitalSmpsSim.boost;
 
+import com.github.ruediste.digitalSmpsSim.quantity.Duration;
 import com.github.ruediste.digitalSmpsSim.shared.PowerCircuitBase;
 
 public class BoostCircuit extends PowerCircuitBase {
 
     public BoostPower power = new BoostPower(this);
-    public BoostControl control = new BoostControl(this);
+    public BoostControlPID control = new BoostControlPID(this);
+
+    public double switchingFrequency = 100e3;
 
     {
         power.vIn.connect(source.out);
@@ -15,11 +18,14 @@ public class BoostCircuit extends PowerCircuitBase {
         load.voltage.connect(power.vOut);
 
         control.outputVoltage.connect(power.vOut);
+        costCalculator.outputVoltage.connect(power.vOut);
+        costCalculator.evaluationPeriod = Duration.of(switchingPeriod());
+        costCalculator.inductorCurrent.connect(power.ilOut);
     }
 
-    public double switchingFrequency = 100e3;
+     public double switchingPeriod() {
 
-    public double switchingPeriod() {
+    
         return 1 / switchingFrequency;
     }
 

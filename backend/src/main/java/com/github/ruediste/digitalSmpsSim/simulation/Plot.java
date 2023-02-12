@@ -6,6 +6,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.github.ruediste.digitalSmpsSim.PlotRest.PlotGroup;
 import com.github.ruediste.digitalSmpsSim.quantity.Duration;
 import com.github.ruediste.digitalSmpsSim.quantity.HasUnit;
 import com.github.ruediste.digitalSmpsSim.quantity.Instant;
@@ -28,6 +29,7 @@ public class Plot {
     public List<PlotValues> values = new ArrayList<>();
 
     public List<PlotYAxis> axes = new ArrayList<>();
+    private PlotGroup plotGroup;
 
     public static class PlotYAxis {
         public int index;
@@ -45,6 +47,9 @@ public class Plot {
         public boolean stepAfter;
         public int yAxisIndex;
 
+        public double sum;
+        public long count;
+
         public Series(String name, Unit unit, Supplier<Double> valueSupplier) {
             this.name = name;
             this.unit = unit;
@@ -55,6 +60,10 @@ public class Plot {
     public static class PlotValues {
         public Instant time;
         public List<Double> values = new ArrayList<>();
+    }
+
+    public Plot(PlotGroup plotGroup) {
+        this.plotGroup = plotGroup;
     }
 
     public <T> Plot add(String name, Plottable plottable) {
@@ -136,7 +145,7 @@ public class Plot {
             end = Instant.of(1);
             timePrefix = SiPrefixRest.toPMod(SiPrefix.ONE);
         }
-
+        this.plotGroup.plots.add(this);
     }
 
 }

@@ -85,6 +85,7 @@ function DisplayPlot({
             name={series.name + "[" + series.unitSymbol + "]"}
             stroke={paletteColor(idx)}
             fill={paletteColor(idx)}
+            dot={false}
             yAxisId={series.yAxisIndex}
             strokeWidth={3}
             animationDuration={0}

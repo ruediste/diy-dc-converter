@@ -16,4 +16,7 @@ public class Instant extends DoubleQuantity<Instant> {
         return new Instant(value);
     }
 
+    public Instant add(Duration duration) {
+        return add(duration.value());
+    }
 }
