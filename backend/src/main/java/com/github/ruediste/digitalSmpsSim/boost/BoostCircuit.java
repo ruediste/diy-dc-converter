@@ -21,11 +21,13 @@ public class BoostCircuit extends PowerCircuitBase {
         costCalculator.outputVoltage.connect(power.vOut);
         costCalculator.evaluationPeriod = Duration.of(switchingPeriod());
         costCalculator.inductorCurrent.connect(power.ilOut);
+
+        costCalculator.targetVoltage = control.targetVoltage;
+        costCalculator.duty.connect(control.dutyOut);
     }
 
-     public double switchingPeriod() {
+    public double switchingPeriod() {
 
-    
         return 1 / switchingFrequency;
     }
 

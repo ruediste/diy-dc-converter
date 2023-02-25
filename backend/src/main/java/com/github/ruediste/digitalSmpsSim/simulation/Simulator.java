@@ -1,6 +1,7 @@
 package com.github.ruediste.digitalSmpsSim.simulation;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import com.github.ruediste.digitalSmpsSim.quantity.Duration;
 import com.github.ruediste.digitalSmpsSim.quantity.Instant;
@@ -46,6 +47,7 @@ public class Simulator {
         long stepCount = 0;
         while (time.value() < finalTime) {
             Instant stepEnd = null;
+            Instant timeF = time;
             for (var element : circuit.elements) {
                 var tmp = element.stepEndTime(time);
                 if (tmp != null && tmp.value() > time.value()) {
@@ -55,8 +57,12 @@ public class Simulator {
                         stepEnd = stepEnd.min(tmp);
                 }
             }
-            if (stepEnd == null)
-                throw new RuntimeException("No Step End found at time " + SiPrefix.format(time.value(), "s"));
+            if (stepEnd == null) {
+                throw new RuntimeException("No Step End found at time " + SiPrefix.format(time.value(),
+                        "s. End Times: " +
+                                circuit.elements.stream().map(e -> e + ":" + e.stepEndTime(timeF))
+                                        .collect(Collectors.joining(", "))));
+            }
 
             if (stepCount == 0)
                 stepEnd = Instant.of(1e-10);

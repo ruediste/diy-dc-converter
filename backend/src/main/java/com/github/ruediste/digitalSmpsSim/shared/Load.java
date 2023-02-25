@@ -9,6 +9,7 @@ import com.github.ruediste.digitalSmpsSim.simulation.Circuit;
 import com.github.ruediste.digitalSmpsSim.simulation.CircuitElement;
 import com.github.ruediste.digitalSmpsSim.simulation.ElementInput;
 import com.github.ruediste.digitalSmpsSim.simulation.ElementOutput;
+import com.github.ruediste.digitalSmpsSim.simulation.StepChangingValue;
 
 public class Load extends CircuitElement {
 
@@ -21,7 +22,7 @@ public class Load extends CircuitElement {
         super(circuit);
     }
 
-    public Resistance resistance;
+    public StepChangingValue<Resistance> resistance = new StepChangingValue<>();
 
     @Override
     public void initialize() {
@@ -30,7 +31,7 @@ public class Load extends CircuitElement {
 
     @Override
     public void run(Instant stepStart, Instant stepEnd, Duration stepDuration) {
-        current.set(voltage.get().divide(resistance));
+        current.set(voltage.get().divide(resistance.get(stepEnd)));
     }
 
 }

@@ -29,17 +29,15 @@ public class Simulations {
 
     private enum Event {
         STEADY,
-        INPUT_DROP
-    }
-
-    private boolean getTrue() {
-        return true;
+        INPUT_DROP,
+        LOAD_DROP,
+        SETPOINT_CHANGE,
     }
 
     private enum Variant {
         MANUAL,
         OPTIMIZE_INDIVIDUAL,
-        OPTIMIZE_ALL
+        OPTIMIZE_ALL,
     }
 
     @PostConstruct
@@ -48,17 +46,16 @@ public class Simulations {
         var optimizer = new Optimizer();
 
         var circuitSet = createCircuits();
-        var variant = Variant.MANUAL;
-        switch (variant) {
+        var simulationPeriods = 1000;
+        switch (Variant.OPTIMIZE_ALL) {
             case MANUAL: {
                 var first = true;
                 for (var circuitSupplier : circuitSet.circuits) {
                     try {
                         var circuit = circuitSupplier.get();
-                        var simulationPeriods = 4000;
                         if (first) {
-                            log.info("kP: {} kI: {} kD: {}", circuit.control.kP, circuit.control.kI,
-                                    circuit.control.kD);
+                            log.info("kP: {} kI: {} kD: {} lowPass: {}", circuit.control.kP, circuit.control.kI,
+                                    circuit.control.kD, circuit.control.lowPass);
                             first = false;
                         }
                         sim.simulate(circuit, circuit.switchingPeriod() * simulationPeriods, circuit.plots);
@@ -72,10 +69,10 @@ public class Simulations {
                 for (var circuitSupplier : circuitSet.circuits) {
                     try {
                         var circuit = circuitSupplier.get();
-                        var simulationPeriods = 2000;
                         var optimization = optimizer.optimize(circuit, List.of(circuitSupplier), simulationPeriods);
                         optimization.accept(circuit);
-                        log.info("kP: {} kI: {} kD: {}", circuit.control.kP, circuit.control.kI, circuit.control.kD);
+                        log.info("kP: {} kI: {} kD: {} lowPass: {}", circuit.control.kP, circuit.control.kI,
+                                circuit.control.kD, circuit.control.lowPass);
                         sim.simulate(circuit, circuit.switchingPeriod() * simulationPeriods, circuit.plots);
                     } catch (Exception e) {
                         log.error("Error in simulation", e);
@@ -83,7 +80,6 @@ public class Simulations {
                 }
                 break;
             case OPTIMIZE_ALL: {
-                var simulationPeriods = 2000;
                 var optimization = optimizer.optimize(circuitSet.circuits.get(0).get(), circuitSet.circuits,
                         simulationPeriods);
                 boolean first = true;
@@ -92,7 +88,8 @@ public class Simulations {
                     optimization.accept(circuit);
                     if (first) {
                         first = false;
-                        log.info("kP: {} kI: {} kD: {}", circuit.control.kP, circuit.control.kI, circuit.control.kD);
+                        log.info("kP: {} kI: {} kD: {} lowPass: {}", circuit.control.kP, circuit.control.kI,
+                                circuit.control.kD, circuit.control.lowPass);
                     }
                     sim.simulate(circuit, circuit.switchingPeriod() * simulationPeriods, circuit.plots);
                 }
@@ -127,7 +124,7 @@ public class Simulations {
         var design = new BoostDesign();
         design.outputRipple = Voltage.of(0.1);
 
-        List<Voltage> vOuts = List.of(6., 10., 20., 40.).stream().map(v -> Voltage.of(v)).toList();
+        List<Voltage> vOuts = List.of(7., 10., 20., 30.).stream().map(v -> Voltage.of(v)).toList();
         List<Current> iOuts = List.of(0.01, 0.1, 1., 2.).stream().map(v -> Current.of(v)).toList();
 
         for (var event : Event.values()) {
@@ -136,17 +133,19 @@ public class Simulations {
                 for (var iOut : iOuts) {
                     if (event == Event.STEADY)
                         continue;
+                    // if (iOut.value() >= 1.)
+                    // continue;
                     // if (event != Event.INPUT_DROP || vOut.value() != 10 || iOut.value() != 1)
                     // continue;
                     result.circuits.add(() -> {
                         var circuit = design.circuit();
-                        circuit.load.resistance = vOut.divide(iOut);
+                        circuit.load.resistance.set(Instant.of(0), vOut.divide(iOut));
                         circuit.power.vCap = vOut;
-                        circuit.control.targetVoltage = vOut;
-                        circuit.costCalculator.targetVoltage = vOut;
+                        circuit.control.targetVoltage.set(Instant.of(0), vOut);
 
                         var iLAvg = Current.of(iOut.value() * vOut.value() / design.inputVoltage.value());
                         // Vo= Vin/(1-D); 1-D=Vin/Vo; D-1=-Vin/Vo; D=1-Vin/Vo;
+
                         var ccmDuty = 1 - design.inputVoltage.value() / vOut.value();
                         var iLRipple = design.inputVoltage.value() * ccmDuty * design.switchingPeriod().value()
                                 / circuit.power.inductance;
@@ -169,18 +168,30 @@ public class Simulations {
                                 .add("Vout", circuit.power.vOut)
                                 .add("IL", circuit.power.ilOut)
                                 .add("d", circuit.control.dutyOut)
-                                .add("Error", circuit.control.errorOut)
+                                // .add("di", circuit.control.di)
+                                // .add("Error", circuit.control.errorOut)
                                 .add("Cost", circuit.costCalculator.currentCost);
                         switch (event) {
                             case INPUT_DROP: {
-                                var dropTime = Instant.of(design.switchingPeriod().value() * 3);
+                                var dropTime = Instant.of(design.switchingPeriod().value() * 100);
                                 circuit.source.voltage.set(dropTime,
                                         design.inputVoltage.minus(1));
-                                plot.add("VIn", circuit.source.out);
                             }
                                 break;
                             case STEADY:
                                 // NOP
+                                break;
+                            case LOAD_DROP: {
+                                var dropTime = Instant.of(design.switchingPeriod().value() * 100);
+                                circuit.load.resistance.set(dropTime,
+                                        circuit.load.resistance.get(Instant.of(0)).scale(1.5));
+                            }
+                                break;
+                            case SETPOINT_CHANGE: {
+                                var dropTime = Instant.of(design.switchingPeriod().value() * 100);
+                                circuit.control.targetVoltage.set(dropTime,
+                                        vOut.scale(0.8));
+                            }
                                 break;
                             default:
                                 break;

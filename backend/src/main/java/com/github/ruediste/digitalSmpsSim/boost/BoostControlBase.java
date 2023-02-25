@@ -8,6 +8,7 @@ import com.github.ruediste.digitalSmpsSim.quantity.Voltage;
 import com.github.ruediste.digitalSmpsSim.simulation.CircuitElement;
 import com.github.ruediste.digitalSmpsSim.simulation.ElementInput;
 import com.github.ruediste.digitalSmpsSim.simulation.ElementOutput;
+import com.github.ruediste.digitalSmpsSim.simulation.StepChangingValue;
 
 public abstract class BoostControlBase extends CircuitElement {
 
@@ -23,7 +24,7 @@ public abstract class BoostControlBase extends CircuitElement {
 
     public double duty = 0.5;
 
-    public Voltage targetVoltage;
+    public StepChangingValue<Voltage> targetVoltage = new StepChangingValue<>();
 
     protected BoostControlBase(BoostCircuit circuit) {
         super(circuit);
@@ -79,6 +80,10 @@ public abstract class BoostControlBase extends CircuitElement {
                     phase = Phase.SWITCH_ON;
 
                     updateDuty(currentTime);
+
+                    if (Double.isNaN(duty)) {
+                        throw new RuntimeException("Duty is NaN");
+                    }
 
                     nextPhaseChange = lastCycleStart.add(circuit.switchingPeriod() * duty);
 

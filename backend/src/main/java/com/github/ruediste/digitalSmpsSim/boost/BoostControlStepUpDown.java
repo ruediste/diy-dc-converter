@@ -11,7 +11,7 @@ public class BoostControlStepUpDown extends BoostControlBase {
     @Override
     protected void updateDuty(Instant currentTime) {
         if (count % 1 == 0) {
-            if (outputVoltage.get().value() < targetVoltage.value()) {
+            if (outputVoltage.get().value() < targetVoltage.get(currentTime).value()) {
                 duty += 1e-2;
             } else
                 duty -= 1e-2;

@@ -12,8 +12,8 @@ public class BoostDesign {
     public Voltage inputVoltage = Voltage.of(5);
     public Voltage outputVoltage = Voltage.of(10);
     public Current inputCurrent = Current.of(2);
-    public double inductorRipple = 0.1;
-    public Voltage outputRipple = Voltage.of(0.050);
+    public double inductorRipple = 0.5;
+    public Voltage outputRipple = Voltage.of(0.10);
 
     public Duration switchingPeriod() {
         return Duration.of(1 / switchingFrequency);
@@ -59,7 +59,7 @@ public class BoostDesign {
         circuit.control.duty = duty();
         circuit.power.inductance = inductance();
         circuit.power.capacitance = outputCapacitance();
-        circuit.load.resistance = loadResistance();
+        circuit.load.resistance.set(Instant.of(0), loadResistance());
     }
 
     public BoostCircuit circuit() {

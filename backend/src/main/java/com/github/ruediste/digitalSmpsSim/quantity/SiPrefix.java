@@ -25,6 +25,9 @@ public enum SiPrefix {
 
 	public static String format(double value, String unit) {
 		var prefix = get(value);
+		if (prefix == null) {
+			return "%.3f%s".formatted(value, unit);
+		}
 		return "%.3f%s%s".formatted(value / prefix.multiplier, prefix.symbol, unit);
 	}
 }
