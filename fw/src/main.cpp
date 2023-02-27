@@ -17,7 +17,7 @@ void HAL_TIM_MspPostInit(TIM_HandleTypeDef *htim)
     GPIO_InitStruct.Pin = GPIO_PIN_8;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
     GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     GPIO_InitStruct.Alternate = GPIO_AF1_TIM1;
     HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
@@ -76,7 +76,7 @@ static void MX_TIM1_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 10000;
+  sConfigOC.Pulse = 0;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
@@ -103,6 +103,30 @@ static void MX_TIM1_Init(void)
   HAL_TIM_MspPostInit(&htim1);
 }
 
+/**
+ * @brief TIM_Base MSP Initialization
+ * This function configures the hardware resources used in this example
+ * @param htim_base: TIM_Base handle pointer
+ * @retval None
+ */
+void HAL_TIM_Base_MspInit(TIM_HandleTypeDef *htim_base)
+{
+  if (htim_base->Instance == TIM1)
+  {
+    /* USER CODE BEGIN TIM1_MspInit 0 */
+
+    /* USER CODE END TIM1_MspInit 0 */
+    /* Peripheral clock enable */
+    __HAL_RCC_TIM1_CLK_ENABLE();
+    /* TIM1 interrupt Init */
+    HAL_NVIC_SetPriority(TIM1_CC_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(TIM1_CC_IRQn);
+    /* USER CODE BEGIN TIM1_MspInit 1 */
+
+    /* USER CODE END TIM1_MspInit 1 */
+  }
+}
+
 void setup()
 {
   // put your setup code here, to run once:
@@ -111,23 +135,81 @@ void setup()
   Serial.begin(115200);
   MX_TIM1_Init();
   HAL_TIM_Base_Start(&htim1);
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start_IT(&htim1, TIM_CHANNEL_1);
   // TIM1->CR1 |= TIM_CR1_CEN;
+  // TIM1->DIER |= TIM_IT_UPDATE;
 }
 
+int n = 300000;
 int count = 0;
 
+const char *names[] = {"CR1",
+                       "CR2",
+                       "SMCR",
+                       "DIER",
+                       "SR",
+                       "EGR",
+                       "CCMR1",
+                       "CCMR2",
+                       "CCER",
+                       "CNT",
+                       "PSC",
+                       "ARR",
+                       "RCR",
+                       "CCR1",
+                       "CCR2",
+                       "CCR3",
+                       "CCR4",
+                       "BDTR",
+                       "DCR",
+                       "DMAR",
+                       "OR"};
 void loop()
 {
-  int n = 30;
-  for (int i = 2; i < n; i++)
+
+  // int n = 30;
+  // for (int i = 2; i < n; i++)
+  // {
+  //   TIM1->CCR1 = (uint16_t)(i * 65536. / n);
+  //   delay(20);
+  // }
+  // for (int i = n - 1; i >= 2; i--)
+  // {
+  //   TIM1->CCR1 = (uint16_t)(i * 65536. / n);
+  //   delay(20);
+  // }
+  Serial.println("Status");
+  Serial.println(count);
+  Serial.println(TIM1->CNT);
+
+  for (int i = 0; i < 15; i++)
   {
-    TIM1->CCR1 = (uint16_t)(i * 65536. / n);
-    delay(20);
+    uint32_t *ptr = (uint32_t *)TIM1_BASE;
+    Serial.print(names[i]);
+    Serial.print(": ");
+    Serial.println(*(ptr + i), 16);
   }
-  for (int i = n - 1; i >= 2; i--)
+  Serial.println();
+  delay(1000);
+}
+
+void _Error_Handler(const char *msg, int val)
+{
+  Serial.print("Error: ");
+  Serial.print(msg);
+  Serial.print(" : ");
+  Serial.println(val);
+  while (1)
   {
-    TIM1->CCR1 = (uint16_t)(i * 65536. / n);
-    delay(20);
+  }
+}
+
+extern "C"
+{
+
+  void TIM1_CC_IRQHandler(void)
+  {
+    TIM1->CCR1 = (uint16_t)(count * 65536. / n);
+    count++;
   }
 }

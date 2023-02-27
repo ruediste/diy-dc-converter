@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": "fw"
+		},
+		{
+			"path": "cubeMX/Core"
+		},
+		{
+			"path": "../../.platformio/packages/framework-arduinoststm32"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.json": "jsonc",
+			"main.h": "c"
+		}
+	}
+}
