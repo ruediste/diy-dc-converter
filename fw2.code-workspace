@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "fw2"
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"*.json": "jsonc",
+			"main.h": "c"
+		}
+	}
+}
