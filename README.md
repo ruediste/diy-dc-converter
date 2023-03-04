@@ -43,7 +43,7 @@ For more advanced designs:
 Highly recommended: an entry level oscilloscope (two channel, 200$ range)
 
 ## The Converters
- * [Getting Started: Boost Converter](doc/010_FirstConverter/README.md)
+See [the converter list](https://ruediste.github.io/diy-dc-converter/)
 
 ## Contributing
 
