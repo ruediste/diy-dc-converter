@@ -1,8 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.scss';
 import App from './App';
-import reportWebVitals from './reportWebVitals';
 import { FirstConverter } from './FirstConverter';
 
 const tools: { [key: string]: () => JSX.Element } = {
@@ -26,7 +25,7 @@ if (document.querySelector('meta[name="generator"]') != null) {
     const root = ReactDOM.createRoot(element);
     root.render(
       <React.StrictMode>
-        <DevSelector />
+        {tools[tool]()}
       </React.StrictMode>
     );
   })
