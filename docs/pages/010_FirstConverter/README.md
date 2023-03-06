@@ -66,3 +66,4 @@ First you'll need an inductor.
 
 TODO: write about inductors, and how to measure their inductance
 
+<div data-tool="first"></div>
