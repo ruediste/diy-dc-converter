@@ -12,6 +12,7 @@
     "@types/react": "^18.0.28",
     "@types/react-dom": "^18.0.11",
     "bootstrap": "^5.2.3",
+    "mathjax": "^3.2.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-scripts": "5.0.1",
@@ -21,7 +22,9 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build && rm -rf ../static && cp -r build/static/ ../ && mkdir -p ../_layouts && cp build/index.html ../_layouts/default.html",
+    "copy-mathjax": "rm -rf ../mathjax && mkdir ../mathjax && cp -r node_modules/mathjax/es5/. ../mathjax/",
+    "copy-dist": "rm -rf ../static && cp -r build/static/ ../ && mkdir -p ../_layouts && cp build/index.html ../_layouts/default.html",
+    "build": "react-scripts build && npm run copy-mathjax && npm run copy-dist",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

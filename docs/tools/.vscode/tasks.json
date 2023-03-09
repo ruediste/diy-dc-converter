@@ -7,6 +7,13 @@
 			"problemMatcher": [],
 			"label": "npm: start",
 			"detail": "react-scripts start"
+		},
+		{
+			"type": "npm",
+			"script": "build",
+			"problemMatcher": [],
+			"label": "npm: build",
+			"detail": "react-scripts build && rm -rf ../static && cp -r build/static/ ../ && mkdir -p ../_layouts && cp build/index.html ../_layouts/default.html"
 		}
 	]
 }

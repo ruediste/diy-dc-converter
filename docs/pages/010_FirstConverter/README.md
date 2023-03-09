@@ -49,21 +49,22 @@ Now that the different components are introduced, we can understand how the conv
 
 The converter goes through several different phases during each switching cycle. These phases are:
 
-1. **Charging Phase:** During this phase, the transistor is turned on and the current through the inductor increases, charging it up with energy from the input. At the same time, the output capacitor discharges to provide current to the load.
+1. **Charge Phase:** During this phase, the transistor is turned on and the current through the inductor increases, charging it up with energy from the input. At the same time, the output capacitor discharges to provide current to the load.
 
 1. **Discharge Phase:** Once the desired current has been reached, the switch is turned off and the inductor begins to discharge its energy through the diode and into the output capacitor and the load. During this phase, the inductor current decreases until it reaches zero.
 
 1. **Idle Phase:** Once the inductor current reaches zero, all the load current is provided by the output capacitor. The phase ends when the next charging phase is started by the controller.
 
 # Building the Converter
-Now that we have a basic understanding of the converter, we can start designing and building one. Unlike for other circuits, there is a myriad of tradeoffs involved in the design. But don't worry, this section will guide you to a working converter.
+Now that we have a basic understanding of the converter, we can start designing and building one. Unlike other circuits, there is a myriad of tradeoffs involved in the design. But don't worry, this section will guide you to a working converter.
 
 To make things easy, the following tool will do all the math for you. Read below on how to use it.
 
-<div> foo </div>
+<div data-tool="first"></div>
 
-First you'll need an inductor. 
+First you'll need an inductor. The main property of an inductor is it's inductance, measured in henrys. We'll discuss below how to measure it. The inductance determines how fast the current in the inductor will change if you apply a certain voltage. The formula is
+
+$$ x = y^2 $$
+
 
 TODO: write about inductors, and how to measure their inductance
-
-<div data-tool="first"></div>
