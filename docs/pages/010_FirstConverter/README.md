@@ -62,9 +62,16 @@ To make things easy, the following tool will do all the math for you. Read below
 
 <div data-tool="first"></div>
 
-First you'll need an inductor. The main property of an inductor is it's inductance, measured in henrys. We'll discuss below how to measure it. The inductance determines how fast the current in the inductor will change if you apply a certain voltage. The formula is
+First you'll need an inductor. The main property of an inductor is it's inductance. But many more properties are in play. The most relevant for our application:
 
-$$ x = y^2 $$
+* Core Saturation: If the current through an inductor is too high, the core saturates and does not resist a change in current anymore
+* Wire Resistance: The copper wire of the inductor has a resistance which causes losses. This can be reduced by using thicker wire, but this makes 
+the inductor bigger, more expensive and heavier
+* Core Eddy Currents: If the core was made of a solid block of iron, a change in the magnetic field would cause currents to flow within the core. This is mitigated by using
+laminated iron sheets for low frequency (mains power) or iron (ferrite) powder for higher frequencies.
+
+This is why our first converter is designed for relatively low frequencies (most effects occur at high frequencies) and low current (core saturation, wire resistance).
+
+Choose or find an inductor made of iron powder (laminated metal sheets won't work) and measure it's inductance using your multimeter (if the function is available) or a component tester.
 
 
-TODO: write about inductors, and how to measure their inductance
