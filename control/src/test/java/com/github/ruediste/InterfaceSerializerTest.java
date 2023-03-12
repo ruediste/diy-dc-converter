@@ -7,9 +7,15 @@ import java.io.ByteArrayOutputStream;
 
 import org.junit.jupiter.api.Test;
 
-import com.github.ruediste.messages.TestMessage;
-
 public class InterfaceSerializerTest {
+
+    public static class TestMessage implements InterfaceMessage {
+        @Datatype.uint16
+        public int uint16Field;
+
+        public float floatField;
+    }
+
     @Test
     public void roundTrip() {
         var serializer = new InterfaceSerializer();

@@ -18,11 +18,6 @@ public class InterfaceSerializer {
         initializeMaps();
     }
 
-    InterfaceSerializer(String pckg) {
-        interfaceClasses = InterfaceLoader.load(pckg);
-        initializeMaps();
-    }
-
     private void initializeMaps() {
         for (var cls : interfaceClasses) {
             interfaceClassesByCls.put(cls.cls, cls);

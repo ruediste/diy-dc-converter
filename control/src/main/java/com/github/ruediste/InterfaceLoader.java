@@ -44,14 +44,11 @@ public class InterfaceLoader {
     }
 
     public static List<InterfaceClass> load() {
-        return load("com.github.ruediste.messages");
-    }
-
-    public static List<InterfaceClass> load(String pckg) {
         var result = new ArrayList<InterfaceClass>();
-        try (ScanResult scanResult = new ClassGraph().enableAllInfo().acceptPackages(pckg)
+        try (ScanResult scanResult = new ClassGraph().enableAllInfo().acceptPackages(App.class.getPackageName())
                 .scan()) {
-            var classInfos = scanResult.getAllClasses().stream()
+            var classInfos = scanResult.getClassesImplementing(InterfaceMessage.class).stream()
+                    .filter(x -> !x.isAbstract())
                     .sorted(Comparator.comparing(x -> x.getSimpleName()))
                     .toList();
             int id = 0;
@@ -80,6 +77,16 @@ public class InterfaceLoader {
                             return Float.intBitsToFloat(value);
                         });
                     }
+                    if (field.getTypeDescriptorStr().equals("Z")) {
+                        typeFound = true;
+                        interfaceField.setType("bool", (obj, out) -> {
+                            boolean value = (boolean) obj;
+                            out.write(value ? 1 : 0);
+                        }, in -> {
+                            int value = in.read();
+                            return value == 1;
+                        });
+                    }
                     for (var annotation : field.getAnnotationInfo()) {
                         if (typeFound) {
                             throw new RuntimeException(
@@ -103,7 +110,7 @@ public class InterfaceLoader {
                     if (!typeFound) {
                         throw new RuntimeException(
                                 "No type annotation found and no known type: " + info.getName() + "."
-                                        + field.getName());
+                                        + field.getName() + " type: " + field.getTypeDescriptorStr());
                     }
                 }
             }
