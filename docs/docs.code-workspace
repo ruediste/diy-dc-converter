@@ -5,6 +5,9 @@
 		},
 		{
 			"path": "tools"
+		},
+		{
+			"path": "../../../gems/gems/minima-2.5.1"
 		}
 	],
 	"settings": {}

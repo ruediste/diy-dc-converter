@@ -112,6 +112,7 @@ public class RealSerialConnection {
 	}
 
 	public synchronized void sendBytes(byte[] tx) {
+		log.debug("Sending {}", hexDump(tx, 0, tx.length));
 		int l = 0;
 		while (true) {
 
@@ -123,7 +124,7 @@ public class RealSerialConnection {
 			if (l >= tx.length)
 				break;
 		}
-		log.debug("Sending {} complete", hexDump(tx, 0, tx.length));
+		log.debug("Sending complete");
 	}
 
 	public String getPort() {

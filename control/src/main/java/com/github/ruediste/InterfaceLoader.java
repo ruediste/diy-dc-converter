@@ -7,6 +7,7 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import io.github.classgraph.*;
 
@@ -25,12 +26,14 @@ public class InterfaceLoader {
     public static class InterfaceField {
         public String name;
         public String cType;
+        public int cSize;
         public Field field;
         public FieldWriter writer;
         public FieldReader reader;
 
-        public void setType(String cType, FieldWriter writer, FieldReader reader) {
+        public void setType(String cType, int cSize, FieldWriter writer, FieldReader reader) {
             this.cType = cType;
+            this.cSize = cSize;
             this.writer = writer;
             this.reader = reader;
         }
@@ -41,6 +44,10 @@ public class InterfaceLoader {
         public int id;
         public List<InterfaceField> fields = new ArrayList<>();
         public Class<?> cls;
+
+        public int size() {
+            return fields.stream().collect(Collectors.summingInt(x -> x.cSize));
+        }
     }
 
     public static List<InterfaceClass> load() {
@@ -66,7 +73,7 @@ public class InterfaceLoader {
                     cls.fields.add(interfaceField);
                     if (field.getTypeDescriptorStr().equals("F")) {
                         typeFound = true;
-                        interfaceField.setType("float", (obj, out) -> {
+                        interfaceField.setType("float", 4, (obj, out) -> {
                             var value = Float.floatToIntBits((Float) obj);
                             out.write(value);
                             out.write(value >> 8);
@@ -79,7 +86,7 @@ public class InterfaceLoader {
                     }
                     if (field.getTypeDescriptorStr().equals("Z")) {
                         typeFound = true;
-                        interfaceField.setType("bool", (obj, out) -> {
+                        interfaceField.setType("bool", 1, (obj, out) -> {
                             boolean value = (boolean) obj;
                             out.write(value ? 1 : 0);
                         }, in -> {
@@ -94,7 +101,7 @@ public class InterfaceLoader {
                         }
 
                         if (Datatype.uint16.class.getName().equals(annotation.getName())) {
-                            interfaceField.setType("uint16", (obj, out) -> {
+                            interfaceField.setType("uint16_t", 2, (obj, out) -> {
                                 var value = (Integer) obj;
                                 out.write(value);
                                 out.write(value >> 8);

@@ -1,0 +1,22 @@
+{
+	"folders": [
+		{
+			"path": "control"
+		},
+		{
+			"path": "fw"
+		}
+	],
+	"settings": {
+		"java.configuration.updateBuildConfiguration": "automatic",
+		"java.compile.nullAnalysis.mode": "automatic",
+		"files.associations": {
+			".npmrc": "plaintext",
+			"stm32f4xx_hal.h": "c",
+			"cstddef": "cpp",
+			"random": "cpp",
+			"limits": "cpp",
+			"main.h": "c"
+		}
+	}
+}

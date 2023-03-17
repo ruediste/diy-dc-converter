@@ -74,4 +74,7 @@ This is why our first converter is designed for relatively low frequencies (most
 
 Choose or find an inductor made of iron powder (laminated metal sheets won't work) and measure it's inductance using your multimeter (if the function is available) or a component tester.
 
+![Inductors](inductors.jpg)
+
+The inductances are (left to right): 314uH, 25uH, 2mH, 1.3uH. If you plug these numbers in the calculator above, you'll see that the first and the third are a good choice. Of course, the big inductor will handle far larger currents.
 

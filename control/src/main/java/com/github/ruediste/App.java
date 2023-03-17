@@ -94,7 +94,17 @@ public class App {
             }
             var baos = new ByteArrayOutputStream();
             interfaceSerializer.serialize(msg, baos);
-            con.sendBytes(baos.toByteArray());
+            try {
+                con.sendBytes(baos.toByteArray());
+            } catch (Exception e) {
+                try {
+                    con.close();
+                } catch (Exception e1) {
+                    // swallow
+                }
+                con = new RealSerialConnection(serialConnectionPath.toString(), 115000);
+                con.sendBytes(baos.toByteArray());
+            }
         }
     }
 

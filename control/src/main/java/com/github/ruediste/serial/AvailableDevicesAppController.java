@@ -90,7 +90,7 @@ public class AvailableDevicesAppController {
 	}
 
 	private boolean isSerialConnection(Path path) {
-		return path.getFileName().toString().startsWith("ttyUSB");
+		return path.getFileName().toString().startsWith("ttyACM");
 	}
 
 	private synchronized void scan() {
