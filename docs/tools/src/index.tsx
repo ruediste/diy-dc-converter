@@ -11,12 +11,13 @@ const tools: { [key: string]: () => JSX.Element } = {
 
 function DevSelector() {
   const [selectedTool, setSelectedTool] = useState<[string, () => JSX.Element]>(['first', tools.first])
-  return <><select className="form-select" value={selectedTool[0]} onChange={e => setSelectedTool([e.target.value, tools[e.target.value]])}>
+  return <div style={{ display: 'flex', justifyContent: 'center' }}><div style={{ width: '680px' }}><select className="form-select" value={selectedTool[0]} onChange={e => setSelectedTool([e.target.value, tools[e.target.value]])}>
     {Object.entries(tools).sort(([a], [b]) => a.localeCompare(b)).map(([e]) =>
       <option key={e} value={e}>{e}</option>)}
   </select>
     {selectedTool[1]()}
-  </>
+  </div>
+  </div>
 }
 
 if (document.querySelector('meta[name="generator"]') != null) {

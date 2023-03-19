@@ -45,7 +45,7 @@ An NPN transistor is a three-terminal electronic component that is widely used i
 When a small current is applied to the base of the transistor, it allows current to flow from the collector to the emitter, effectively turning the switch on. Conversely, when no current is applied to the base, the transistor blocks current flow, turning the switch off.
 
 # Operation of the Boost Converter
-Now that the different components are introduced, we can understand how the converter works. To keep things simple, the first converter will operate in discontinuous conduction mode (DCM). You don't have to understand this yet, but be aware that there is also a continous conduction mode (CCM), which is harder to control.
+Now that the different components are introduced, we can understand how the converter works. To keep things simple, the first converter will operate in discontinuous conduction mode (DCM). You don't have to understand this yet, but be aware that there is also a continuous conduction mode (CCM), which is harder to control.
 
 The converter goes through several different phases during each switching cycle. These phases are:
 
@@ -78,3 +78,118 @@ Choose or find an inductor made of iron powder (laminated metal sheets won't wor
 
 The inductances are (left to right): 314uH, 25uH, 2mH, 1.3uH. If you plug these numbers in the calculator above, you'll see that the first and the third are a good choice. Of course, the big inductor will handle far larger currents.
 
+Next get an adequate load resistor. The resistor will turn the output power of the converter into heat. Therefore it needs to be adequately sized. The following table shows typical sizes and their rating:
+
+| **Power Rating <br/> [W]** | **Diameter<br/> [mm]** | **Length<br/>[mm]** | **Lead Diameter <br/> [mm]** |
+|---|---|---|---|
+| **1/8** | 1.8 | 3 | 0.45 |
+| **1/4** | 2.5 | 6.5 | 0.6 |
+| **1/2** | 3.2 | 8.5 | 0.6 |
+| **1** | 5 | 11 | 0.8 |
+| **2** | 5.5 | 15 | 1 |
+| **3** | 6 | 17 | 1.1 |
+| **5** | 7.5 | 24 | 1.2 |
+
+The rest of the parts are less critical. For the capacitors, any larger value (up to a factor of perhaps 5x) will do. For the base resistor, I'd stay within 1/2 to 2x the value indicated.
+
+![](fritzing_bb.svg)
+
+# Explanation of the Calculations
+If you are interested, this section explains the calculations performed by the tool above.
+
+First some basic formulas:
+
+## Inductor
+The inductance determines how fast the current in the inductor will change if you apply a certain voltage. The formula is
+
+$$ V = L \frac{\Delta I}{T} $$
+
+With 
+
+* $$V$$: The voltage applied to the inductor in volts
+* $$L$$: The inductance of the inductor in henrys
+* $$\Delta I$$: The change in current of over the given time frame in amperes
+* $$T$$: The time the voltage is applied to the inductor in seconds
+
+Usually, we don't need the voltage but are interested in the time for a given current change, or the current change over a given time:
+
+$$ T = L \frac{\Delta I}{V}; \Delta I = \frac{VT}{L}  $$
+
+## Capacitor
+The capacitance determines much current flows through the capacitor for a certain rate of voltage change. The formula is
+
+$$ I = C \frac{\Delta V}{T} $$
+
+With 
+
+* $$I$$: The current flowing through the inductor
+* $$C$$: The capacitance of the capacitor in farads
+* $$\Delta V$$: The change in voltage of over the given time frame in volts
+* $$T$$: The time of the voltage change in seconds
+
+The formula above solved for time, $$\Delta V$$ and $$C$$:
+
+$$ T = C \frac{\Delta V}{I};\; \Delta V=\frac{IT}{C};\; C=\frac{IT}{\Delta V}$$
+
+## Calculation
+The calculation of the converter is not trivial, but it isn't rocket science either.
+
+First, let's define the time: $$t_1$$ is the time of the charge phase and $$t_2$$ is the time of the discharge phase. $$T$$ is the total cycle time and $$d_\text{idle}$$ is the fraction of the cycle time of the idle phase.
+
+$$ t_1+t_2+Td_\text{idle}=T $$
+
+$$ t_1+t_2=T (1-d_\text{idle}) \tag{1}$$
+
+Next we can look at the inductor current: During the charge phase the current raises linearly to $$I_\text{peak}$$:
+
+$$ \frac{t_1V_\text{in}}{L} = I_\text{peak} \tag{2}$$
+
+where $$L$$ is the inductance and $$V_\text{in}$$ is the input voltage. 
+
+In a similar manner during the discharge phase the current drops to zero
+
+$$ \frac{t_2(V_\text{out}-V_\text{in})}{L} = I_\text{peak} \tag{3}$$
+
+with the output voltage $$V_\text{out}$$.
+
+Ultimately, the average output current $$I_\text{out}$$ must equal the product of the average current during the discharge time, which is $$\frac{I_\text{peak}}{2}$$, and the fraction of time $$t_2$$ occupies during the entire cycle.
+
+$$ I_\text{out} = \frac{I_\text{peak}}{2} \frac{t_2}{T} $$
+
+$$ \frac{2TI_\text{out}}{t_2} =I_\text{peak} \tag{4}$$
+
+Now we can derive the formula for $$I_\text{peak}$$:
+
+$$\text{(2,3)}  \qquad  t_1V_\text{in}=t_2(V_\text{out}-V_\text{in})$$
+
+$$ \frac{t_1}{t_2} = \frac{V_\text{out}-V_\text{in}}{V_\text{in}}=k \tag{5}$$
+
+$$\text{(1,5)}  \qquad t_1=kt_2; (k+1)t_2=T (1-d_\text{idle}) $$
+
+$$T=\frac{ (k+1)t_2}{1-d_\text{idle} } \tag{6}$$
+
+$$\text{(4,6)} \qquad \frac{2(k+1)I_\text{out}}{1-d_\text{idle}} =I_\text{peak} $$
+
+From this we can calculate the other quantities:
+
+$$ t_1=\frac{LI_\text{peak}}{V_\text{in}} $$
+
+$$ t_2= \frac{LI_\text{peak}}{V_\text{out}-V_\text{in}} $$
+
+$$ T= \frac{t_1+t_2}{1-d_\text{idle}} $$
+
+The output capacitance $$C_\text{out}$$ given the output ripple $$V_\text{rout}$$:
+
+$$ C_\text{out}=\frac{I_\text{peak}t_2}{2V_\text{rout}} $$
+
+And the input capacitance: 
+
+$$ C_\text{in}=\frac{I_\text{peak}t_1}{2V_\text{rin}} $$
+
+The load resistor is simply
+
+$$ R_\text{load}=\frac{V_\text{out}}{I_\text{out}} $$
+
+and the output power is
+
+$$ P_{out}=V_\text{out}I_\text{out} $$ 
