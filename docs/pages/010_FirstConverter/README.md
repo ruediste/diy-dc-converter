@@ -62,6 +62,7 @@ To make things easy, the following tool will do all the math for you. Read below
 
 <div data-tool="first"></div>
 
+## Components
 First you'll need an inductor. The main property of an inductor is it's inductance. But many more properties are in play. The most relevant for our application:
 
 * Core Saturation: If the current through an inductor is too high, the core saturates and does not resist a change in current anymore
@@ -91,6 +92,16 @@ Next get an adequate load resistor. The resistor will turn the output power of t
 | **5** | 7.5 | 24 | 1.2 |
 
 The rest of the parts are less critical. For the capacitors, any larger value (up to a factor of perhaps 5x) will do. For the base resistor, I'd stay within 1/2 to 2x the value indicated.
+
+## Controller
+For the controller, I chose the so-called black pill, a STM32F401 based board. It's quite affordable (3-4$) and quite capable. This will come handy for the more advanced control algorithms, and to allow for faster control loop frequencies.
+
+To program the firmware, clone the repository and open the workspace `fw.code-workspace` in visual studio code. The project is based on platformio, thus all dependencies and tools should be installed automatically. Just connect the board with the st-link programmer and upload the firmware.
+
+To control the firmware, there is a Java application. Make sure you have the "Extension Pack for Java" installed (`ext install vscjava.vscode-java-pack`), open the `Run and Debug` tab and launch the application. It communicates with the firmware to easily change the settings.
+
+## The Circuit
+Now it's time to build the circuit. The following is an example of how to layout the converter on a breadboard:
 
 ![](fritzing_bb.svg)
 

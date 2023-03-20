@@ -10,6 +10,10 @@ The material available online is largely targeted at university students and mig
 
 By controlling the converter digitally using standard hobbyist microcontroller boards from the arduino ecosystem, the circuits can be kept simple and the control algorithms can be quite sophisticated.
 
+* TOC
+{:toc}
+
+
 ## State of the Project
 I'm just getting started.
 
