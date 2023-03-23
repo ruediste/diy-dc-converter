@@ -315,9 +315,14 @@ export function FirstConverter() {
             <div> Peak Inductor Current: {formatValue(peakCurrent, currentUnits)}
                 <RangeIndicator value={peakCurrent} min={1e-3} max={1} maxWarning="Make sure your inductor and your transistor can handle this current" units={currentUnits} />
             </div>
-            <div> Load Resistor: {formatValue(loadResistor, resistanceUnits)} </div>
-            <div> Output Power: {formatValue(outputPower, powerUnits)}
-                <RangeIndicator value={outputPower} min={1e-3} max={250e-3} maxWarning="Typical small resistors are rated for 1/8W or 1/4W. Make sure to use an adequate resistor" units={powerUnits} />
+            <div className="row">
+                <div className="col col-3"> Load Resistor: {formatValue(loadResistor, resistanceUnits)} </div>
+                <div className="col"> Output Power: {formatValue(outputPower, powerUnits)}
+                    <RangeIndicator value={outputPower} min={1e-3} max={250e-3} maxWarning="Typical small resistors are rated for 1/8W or 1/4W. Make sure to use an adequate resistor" units={powerUnits} />
+                </div>
+            </div>
+            <div> Base Current: {formatValue(baseCurrent, currentUnits)}
+                <RangeIndicator value={baseCurrent} min={0} max={20e-3} maxWarning="The datasheet of the STM32F401 indicates a max current of 25mA. Don't exceed it" units={currentUnits} />
             </div>
             <div className="row">
                 <div className="col">

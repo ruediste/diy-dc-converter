@@ -12,9 +12,15 @@ namespace PWMMode
         htim1.Instance->CCR1 = config->compare;
         htim1.Instance->PSC = config->prescale;
 
-        HAL_TIM_Base_Start(&htim1);
-        HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-        // HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+        if (config->running)
+        {
+            HAL_TIM_Base_Start(&htim1);
+            HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+        }
+        else
+        {
+            HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+        }
     }
 }
 

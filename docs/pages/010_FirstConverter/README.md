@@ -77,7 +77,7 @@ Choose or find an inductor made of iron powder (laminated metal sheets won't wor
 
 ![Inductors](inductors.jpg)
 
-The inductances are (left to right): 314uH, 25uH, 2mH, 1.3uH. If you plug these numbers in the calculator above, you'll see that the first and the third are a good choice. Of course, the big inductor will handle far larger currents.
+The inductances are (left to right): 314uH, 25uH, 2mH, 1.3uH. If you plug these numbers in the calculator above, you'll see that the first and the third are good choices. Of course, the big inductor will handle far larger currents.
 
 Next get an adequate load resistor. The resistor will turn the output power of the converter into heat. Therefore it needs to be adequately sized. The following table shows typical sizes and their rating:
 
@@ -91,10 +91,16 @@ Next get an adequate load resistor. The resistor will turn the output power of t
 | **3** | 6 | 17 | 1.1 |
 | **5** | 7.5 | 24 | 1.2 |
 
+For the transistor, choose any small NPN transistor. Download it's datasheet and search the dc gain ($$h_\text{FE}$$) section. For example
+
+![](currentGain.png)
+
+Search the gain at $$I_C$$ larger than the peak inductor current and plug it into the calculator. Lower the gain, until you reach a base resistor you have in stock.
+
 The rest of the parts are less critical. For the capacitors, any larger value (up to a factor of perhaps 5x) will do. For the base resistor, I'd stay within 1/2 to 2x the value indicated.
 
 ## Controller
-For the controller, I chose the so-called black pill, a STM32F401 based board. It's quite affordable (3-4$) and quite capable. This will come handy for the more advanced control algorithms, and to allow for faster control loop frequencies.
+For the controller, I chose the so-called black pill, a STM32F401 based board. It's affordable (3-4$) and quite capable. This will come handy for the more advanced control algorithms, and to allow for higher control loop frequencies.
 
 To program the firmware, clone the repository and open the workspace `fw.code-workspace` in visual studio code. The project is based on platformio, thus all dependencies and tools should be installed automatically. Just connect the board with the st-link programmer and upload the firmware.
 
@@ -104,6 +110,24 @@ To control the firmware, there is a Java application. Make sure you have the "Ex
 Now it's time to build the circuit. The following is an example of how to layout the converter on a breadboard:
 
 ![](fritzing_bb.svg)
+
+The control pin of the microcontroller is A8, connect the base resistor to it. Note that the transistor shown uses the EBC pin order. Make sure to check the pin assignment of your transistor. The following is an picture of my build:
+
+![](breadboard.jpg)
+
+The inductor is from an old LED light bulb, with the inductance printed onto it (3.76 mH). Settings: input: 5V, output: 12V, current: 12mA, idle: 20%.
+
+I used a separate power supply for the converter. This way, if something goes wrong there is no risk of damage to my computer. Don't forget to connect ground. Next start the firmware controller with the connection to the base disconnected, choose the `PWM` mode, enter the frequency from the calculator and start with a duty cycle of 1%. 
+
+![](fwController.png)
+
+You can send the current configuration to the microcontroller using the `Send` button. If you check `Autosend`, this will happen automatically after each change. Connect a multimeter and slowly increase the duty cycle. The voltage should rise after each change, until you reach the desired voltage at the calculated duty cycle. If the voltage stops rising, this typically indicates a problem with the converter. For example the transistor could saturate (base resistor too large), or the core could saturate (core current too high). You can try to just increase the duty cycle, but this might blow your transistor.
+
+On the oscilloscope, the waveform looks like this: (channel 1: switching node, channel 2: output, AC coupling)
+
+![](waveForm.png)
+
+Congratulations, you have built your first converter! But there is control of the output yet. If the load changes, the output voltage will change as well. Continue to the next section to change that.
 
 # Explanation of the Calculations
 If you are interested, this section explains the calculations performed by the tool above.
