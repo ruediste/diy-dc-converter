@@ -1,9 +1,14 @@
 package com.github.ruediste.mode;
 
 import java.awt.Component;
+import java.awt.GridLayout;
 import java.io.Serializable;
 
 import javax.swing.JLabel;
+import javax.swing.*;
+
+import com.github.ruediste.InterfaceMessage;
+import com.github.ruediste.Datatype;
 
 public class DcmBoostPidControlMode extends Mode<DcmBoostPidControlMode.Settings> {
 
@@ -11,22 +16,100 @@ public class DcmBoostPidControlMode extends Mode<DcmBoostPidControlMode.Settings
         super("DCM Boost PID Control");
     }
 
-    public static class Settings implements Serializable {
+    public static class DcmBoostPidStatusMessage implements InterfaceMessage {
+        @Datatype.uint16
+        public int adc0;
 
+        @Datatype.uint16
+        public int adc1;
+    }
+
+    public static class DcmBoostPidConfigMessage implements InterfaceMessage {
+        public float kP;
+        public float kI;
+        public float kD;
+
+        @Datatype.uint16
+        public int reloadPwm;
+
+        @Datatype.uint16
+        public int prescalePwm;
+
+        @Datatype.uint16
+        public int reloadCtrl;
+
+        @Datatype.uint16
+        public int prescaleCtrl;
+
+        public boolean running;
+    }
+
+    public static class Settings implements Serializable {
+        /** in hertz */
+        double frequencyPwm = 10e3;
+
+        /** in hertz */
+        double frequencyControl = 10e3;
+
+        boolean running;
     }
 
     @Override
     public ModeInstance<DcmBoostPidControlMode.Settings> createInstance() {
         return new ModeInstance<DcmBoostPidControlMode.Settings>() {
 
+            JLabel statusLabel = new JLabel();
+
             @Override
-            public Component initialize(Settings settings, Runnable onChange) {
-                return new JLabel("Foo");
+            public Component initializeImpl(Settings settings, Runnable onChange) {
+                JPanel main = new JPanel(new GridLayout(4, 2));
+                main.add(new JLabel("Control Frequency [kHz]"));
+                main.add(
+                        register(new JSpinner(new SpinnerNumberModel(settings.frequencyControl / 1e3, 1e-3, 500, 1e-3)),
+                                value -> settings.frequencyControl = value * 1e3));
+
+                main.add(new JLabel("PWM Frequency [kHz]"));
+                main.add(
+                        register(new JSpinner(new SpinnerNumberModel(settings.frequencyPwm / 1e3, 1e-3, 500, 1e-3)),
+                                value -> settings.frequencyPwm = value * 1e3));
+
+                main.add(new JLabel("Running"));
+                var running = new JCheckBox();
+                running.setSelected(settings.running);
+                running.addActionListener(e -> {
+                    settings.running = running.isSelected();
+                    onChange.run();
+                });
+                main.add(running);
+
+                main.add(new JLabel("Status"));
+                main.add(statusLabel);
+
+                return main;
+            }
+
+            @Override
+            public void handle(Object msg) {
+                if (msg instanceof DcmBoostPidStatusMessage status) {
+                    statusLabel.setText("adc0: " + status.adc0 + " adc1: " + status.adc1);
+                }
             }
 
             @Override
             public Object toConfigMessage(Settings settings) {
-                return null;
+                var calc = new PwmValuesCalculator();
+                var msg = new DcmBoostPidConfigMessage();
+                {
+                    var controlPwm = calc.calculate(settings.frequencyControl, 0);
+                    msg.reloadCtrl = (int) controlPwm.reload;
+                    msg.prescaleCtrl = (int) controlPwm.prescale;
+                }
+                {
+                    var pwm = calc.calculate(settings.frequencyPwm, 0);
+                    msg.reloadPwm = (int) pwm.reload;
+                    msg.prescalePwm = (int) pwm.prescale;
+                }
+                return msg;
             }
 
         };

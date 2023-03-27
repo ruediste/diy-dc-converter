@@ -89,30 +89,53 @@ public class App {
         public void send() {
             var msg = instance.toConfigMessage(settings);
             System.out.println("Send " + msg);
-            if (con == null) {
-                con = new RealSerialConnection(serialConnectionPath.toString(), 115000);
-            }
+            openSerialConnection();
             var baos = new ByteArrayOutputStream();
             interfaceSerializer.serialize(msg, baos);
             try {
                 con.sendBytes(baos.toByteArray());
             } catch (Exception e) {
-                try {
-                    con.close();
-                } catch (Exception e1) {
-                    // swallow
-                }
-                con = new RealSerialConnection(serialConnectionPath.toString(), 115000);
+                closeSerialConnection();
+                openSerialConnection();
                 con.sendBytes(baos.toByteArray());
             }
+        }
+
+        public void handle(Object msg) {
+            instance.handle(msg);
         }
     }
 
     RealSerialConnection con;
+    LoopingThread readLoop;
     ModeInstanceController<?> modeInstanceController;
 
     List<Path> serialConnections;
     Path serialConnectionPath;
+
+    private void closeSerialConnection() {
+        if (con == null)
+            return;
+
+        try {
+            con.close();
+        } catch (Exception e1) {
+            // swallow
+        }
+        readLoop.stop();
+        con = null;
+    }
+
+    private void openSerialConnection() {
+        if (con != null)
+            return;
+        con = new RealSerialConnection(serialConnectionPath.toString(), 115000);
+        var in = con.getIn();
+        readLoop = new LoopingThread("Read Loop", () -> {
+            var msg = interfaceSerializer.deserialize(in);
+            SwingUtilities.invokeLater(() -> modeInstanceController.handle(msg));
+        }, in::close);
+    }
 
     private void createAndShowGUI() {
         // Create and set up the window.

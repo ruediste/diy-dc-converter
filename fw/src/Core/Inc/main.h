@@ -38,6 +38,8 @@ extern "C"
   /* Exported types ------------------------------------------------------------*/
   /* USER CODE BEGIN ET */
   extern TIM_HandleTypeDef htim1;
+  extern TIM_HandleTypeDef htim9;
+  extern ADC_HandleTypeDef hadc1;
   /* USER CODE END ET */
 
   /* Exported constants --------------------------------------------------------*/

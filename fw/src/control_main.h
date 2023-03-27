@@ -1,5 +1,5 @@
-#ifndef MESSAGE_RECEIVING_H
-#define MESSAGE_RECEIVING_H
+#ifndef CONTROL_MAIN_H
+#define CONTROL_MAIN_H
 
 #include <stdint.h>
 
@@ -9,6 +9,8 @@ extern "C"
 #endif
 
     void receiveData(uint8_t *buf, uint32_t *len);
+    void onControlLoop();
+    void controlMain();
 
 #ifdef __cplusplus
 }

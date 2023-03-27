@@ -35,7 +35,7 @@ public class PwmMode extends Mode<PwmMode.Settings> {
     }
 
     public static class Settings implements Serializable {
-        /** in herz */
+        /** in hertz */
         double frequency = 10e3;
 
         /** 0..1 */
@@ -48,19 +48,8 @@ public class PwmMode extends Mode<PwmMode.Settings> {
     public ModeInstance<PwmMode.Settings> createInstance() {
         return new ModeInstance<PwmMode.Settings>() {
 
-            UiRefresh refresh = new UiRefresh();
-
-            private JSpinner register(JSpinner spinner, Consumer<Double> setter) {
-                spinner.addChangeListener(e -> {
-                    setter.accept((Double) spinner.getValue());
-                    refresh.trigger();
-                });
-                return spinner;
-            }
-
             @Override
-            public Component initialize(Settings settings, Runnable onChange) {
-                refresh.register(onChange);
+            public Component initializeImpl(Settings settings, Runnable onChange) {
 
                 JPanel main = new JPanel(new GridLayout(4, 2));
                 main.add(new JLabel("Frequency [kHz]"));

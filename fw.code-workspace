@@ -12,11 +12,14 @@
 		"java.compile.nullAnalysis.mode": "automatic",
 		"files.associations": {
 			".npmrc": "plaintext",
+			"*.json": "jsonc",
 			"stm32f4xx_hal.h": "c",
 			"cstddef": "cpp",
 			"random": "cpp",
 			"limits": "cpp",
-			"main.h": "c"
+			"main.h": "c",
+			"string": "cpp",
+			"string_view": "cpp"
 		}
 	}
 }

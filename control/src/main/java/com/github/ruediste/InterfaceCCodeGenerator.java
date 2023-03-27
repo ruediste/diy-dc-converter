@@ -33,7 +33,7 @@ public class InterfaceCCodeGenerator {
                 header.append("};\n\n");
             }
 
-            header.append("enum class MessageType {\n");
+            header.append("enum class MessageType : uint8_t {\n");
             for (var info : interfaceClasses) {
                 header.append("  " + info.simpleName + "=" + info.id + ",\n");
             }

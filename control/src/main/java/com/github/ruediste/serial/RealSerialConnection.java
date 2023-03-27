@@ -62,6 +62,7 @@ public class RealSerialConnection {
 				if (m > 0) {
 					log.debug("received {}", hexDump(buffer, 0, m));
 					out.write(buffer, 0, m);
+					out.flush();
 				}
 				if (closing) {
 					break;
