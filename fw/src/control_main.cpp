@@ -37,11 +37,28 @@ namespace PWMMode
     }
 }
 
+template <typename T>
+struct MessageBuffer
+{
+    uint8_t type;
+    T msg;
+
+    MessageBuffer(MessageType type)
+    {
+        this->type = (uint8_t)type;
+    }
+
+    uint8_t *bytes()
+    {
+        return (uint8_t *)this;
+    }
+};
+
 namespace DcmBoostPid
 {
-    const int adcBufCount = 9;
+    const int adcBufCount = 8;
     uint16_t adcBuf[adcBufCount];
-    int controlCount;
+    volatile int controlCount;
 
     void control()
     {
@@ -55,33 +72,49 @@ namespace DcmBoostPid
         if (now - lastStatusSend > 500)
         {
             lastStatusSend = now;
-            uint8_t buf[sizeof(DcmBoostPidStatusMessage) + 1];
-            buf[0] = (uint8_t)MessageType::DcmBoostPidStatusMessage;
-            DcmBoostPidStatusMessage *msg = (DcmBoostPidStatusMessage *)(buf + 1);
-            uint16_t adc0 = 0;
-            int adc0Count = 0;
-            uint16_t adc1 = 0;
-            int adc1Count = 0;
-            __disable_irq();
-            int offset = adcBufCount - DMA2_Stream2->NDTR;
-            for (int i = 1; i < adcBufCount; i++)
+
             {
-                auto value = adcBuf[(i + offset) % adcBufCount];
-                if ((i % 2) == 0)
+                MessageBuffer<DcmBoostPidStatusMessage> buf(MessageType::DcmBoostPidStatusMessage);
+
+                uint16_t adc0 = 0;
+                int adc0Count = 0;
+                uint16_t adc1 = 0;
+                int adc1Count = 0;
+                __disable_irq();
+                int offset = adcBufCount - DMA2_Stream0->NDTR;
+                for (int i = 1; i < adcBufCount; i++)
                 {
-                    adc0 += value + 1;
-                    adc0Count++;
+                    auto value = adcBuf[(i + offset) % adcBufCount];
+                    if ((i % 2) == 0)
+                    {
+                        adc0 += value + 1;
+                        adc0Count++;
+                    }
+                    if ((i % 2) == 1)
+                    {
+                        adc1 += value;
+                        adc1Count++;
+                    }
                 }
-                if ((i % 2) == 1)
-                {
-                    adc1 += value;
-                    adc1Count++;
-                }
+                __enable_irq();
+                buf.msg.adc0 = adc0 / adc0Count;
+                buf.msg.adc1 = adc1 / adc1Count; // + controlCount;
+                while (CDC_Transmit_FS(buf.bytes(), sizeof(buf)) == USBD_BUSY)
+                    ;
             }
-            __enable_irq();
-            msg->adc0 = adc0 / adc0Count;
-            msg->adc1 = adc1 / adc1Count + controlCount;
-            CDC_Transmit_FS(buf, sizeof(buf));
+            {
+                MessageBuffer<DebugMessage> buf(MessageType::DebugMessage);
+                uint32_t *buf2 = (uint32_t *)buf.msg.data;
+                buf2[0] = ADC1->SR;
+                buf2[1] = ADC1->CR1;
+                buf2[2] = DMA2_Stream0->NDTR;
+                buf2[3] = TIM1->SR;
+                while (CDC_Transmit_FS(buf.bytes(), sizeof(buf)) == USBD_BUSY)
+                    ;
+                ADC1->SR = 0;
+                TIM1->SR = 0;
+                // ADC1->CR2 |= ADC_CR2_JSWSTART;
+            }
         }
     }
 
@@ -90,7 +123,7 @@ namespace DcmBoostPid
         htim1.Instance->ARR = config->reloadPwm;
         htim1.Instance->PSC = config->prescalePwm;
         htim1.Instance->CCR1 = config->reloadPwm / 8;
-        htim1.Instance->CCR4 = 10;
+        htim1.Instance->CCR3 = 10;
 
         htim9.Instance->ARR = config->reloadCtrl;
         htim9.Instance->PSC = config->prescaleCtrl;
@@ -103,14 +136,15 @@ namespace DcmBoostPid
         {
             HAL_TIM_Base_Start(&htim1);
             HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-            HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
+            HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
 
             HAL_TIM_Base_Start_IT(&htim9);
 
             for (int i = 0; i < adcBufCount; i++)
                 adcBuf[i] = 0;
 
-            HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adcBuf, sizeof(adcBuf));
+            HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adcBuf, adcBufCount /*sizeof(adcBuf)*/);
+            // HAL_ADC_Start(&hadc1);
         }
         else
         {

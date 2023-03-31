@@ -28,7 +28,11 @@ public class InterfaceCCodeGenerator {
             for (var info : interfaceClasses) {
                 header.append("struct __attribute__((packed)) " + info.simpleName + "{\n");
                 for (var field : info.fields) {
-                    header.append("  " + field.cType + " " + field.name + ";\n");
+                    header.append("  " + field.cType + " " + field.name);
+                    if (field.arraySize != null) {
+                        header.append("[" + field.arraySize + "]");
+                    }
+                    header.append(";\n");
                 }
                 header.append("};\n\n");
             }

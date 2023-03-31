@@ -8,7 +8,9 @@ import javax.swing.JLabel;
 import javax.swing.*;
 
 import com.github.ruediste.InterfaceMessage;
+import com.github.ruediste.serial.RealSerialConnection;
 import com.github.ruediste.Datatype;
+import com.github.ruediste.DebugMessage;
 
 public class DcmBoostPidControlMode extends Mode<DcmBoostPidControlMode.Settings> {
 
@@ -59,10 +61,11 @@ public class DcmBoostPidControlMode extends Mode<DcmBoostPidControlMode.Settings
         return new ModeInstance<DcmBoostPidControlMode.Settings>() {
 
             JLabel statusLabel = new JLabel();
+            JLabel[] debugLabels = new JLabel[4];
 
             @Override
             public Component initializeImpl(Settings settings, Runnable onChange) {
-                JPanel main = new JPanel(new GridLayout(4, 2));
+                JPanel main = new JPanel(new GridLayout(4 + debugLabels.length, 2));
                 main.add(new JLabel("Control Frequency [kHz]"));
                 main.add(
                         register(new JSpinner(new SpinnerNumberModel(settings.frequencyControl / 1e3, 1e-3, 500, 1e-3)),
@@ -85,6 +88,12 @@ public class DcmBoostPidControlMode extends Mode<DcmBoostPidControlMode.Settings
                 main.add(new JLabel("Status"));
                 main.add(statusLabel);
 
+                for (int i = 0; i < debugLabels.length; i++) {
+                    main.add(new JLabel("Debug " + i));
+                    debugLabels[i] = new JLabel();
+                    main.add(debugLabels[i]);
+                }
+
                 return main;
             }
 
@@ -92,6 +101,12 @@ public class DcmBoostPidControlMode extends Mode<DcmBoostPidControlMode.Settings
             public void handle(Object msg) {
                 if (msg instanceof DcmBoostPidStatusMessage status) {
                     statusLabel.setText("adc0: " + status.adc0 + " adc1: " + status.adc1);
+                }
+
+                if (msg instanceof DebugMessage dbg) {
+                    for (int i = 0; i < debugLabels.length; i++) {
+                        debugLabels[i].setText(RealSerialConnection.hexDump(dbg.data, i * 4, 4));
+                    }
                 }
             }
 
@@ -109,6 +124,7 @@ public class DcmBoostPidControlMode extends Mode<DcmBoostPidControlMode.Settings
                     msg.reloadPwm = (int) pwm.reload;
                     msg.prescalePwm = (int) pwm.prescale;
                 }
+                msg.running = settings.running;
                 return msg;
             }
 

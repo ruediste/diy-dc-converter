@@ -27,6 +27,7 @@ public class InterfaceLoader {
         public String name;
         public String cType;
         public int cSize;
+        public Integer arraySize;
         public Field field;
         public FieldWriter writer;
         public FieldReader reader;
@@ -108,6 +109,23 @@ public class InterfaceLoader {
                             }, in -> {
                                 return in.read() | in.read() << 8;
                             });
+                        } else if (Datatype.array.class.getName().equals(annotation.getName())) {
+                            int size = (int) annotation.getParameterValues().get("value").getValue();
+                            interfaceField.arraySize = size;
+                            if (field.getTypeDescriptorStr().equals("[B")) {
+                                interfaceField.setType("uint8_t", size, (obj, out) -> {
+                                    var value = (byte[]) obj;
+                                    if (value.length != size)
+                                        throw new RuntimeException("Array length mismatch. Expected " + size
+                                                + ", received " + value.length);
+                                    out.write(value);
+                                }, in -> {
+                                    return in.readNBytes(size);
+                                });
+                            } else
+                                throw new RuntimeException(
+                                        "Unknown array type: " + info.getName() + "."
+                                                + field.getName() + " type: " + field.getTypeDescriptorStr());
                         } else {
                             throw new RuntimeException("Unknown annotation " + annotation.getName() + " on "
                                     + info.getName() + "." + field.getName());
