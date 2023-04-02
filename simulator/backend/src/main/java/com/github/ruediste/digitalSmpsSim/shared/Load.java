@@ -1,37 +1,27 @@
 package com.github.ruediste.digitalSmpsSim.shared;
 
-import com.github.ruediste.digitalSmpsSim.quantity.Current;
-import com.github.ruediste.digitalSmpsSim.quantity.Duration;
-import com.github.ruediste.digitalSmpsSim.quantity.Instant;
-import com.github.ruediste.digitalSmpsSim.quantity.Resistance;
-import com.github.ruediste.digitalSmpsSim.quantity.Voltage;
-import com.github.ruediste.digitalSmpsSim.simulation.Circuit;
 import com.github.ruediste.digitalSmpsSim.simulation.CircuitElement;
-import com.github.ruediste.digitalSmpsSim.simulation.ElementInput;
-import com.github.ruediste.digitalSmpsSim.simulation.ElementOutput;
 import com.github.ruediste.digitalSmpsSim.simulation.StepChangingValue;
 
 public class Load extends CircuitElement {
 
-    public ElementInput<Voltage> voltage = new ElementInput<>(this) {
-    };
-    public ElementOutput<Current> current = new ElementOutput<>(this) {
-    };
+    private PowerCircuitBase circuit;
 
-    protected Load(Circuit circuit) {
+    protected Load(PowerCircuitBase circuit) {
         super(circuit);
+        this.circuit = circuit;
     }
 
-    public StepChangingValue<Resistance> resistance = new StepChangingValue<>();
+    public StepChangingValue<Double> resistance = new StepChangingValue<>();
 
     @Override
     public void initialize() {
-        current.set(Current.of(0));
+        circuit.outputCurrent.set(0.);
     }
 
     @Override
-    public void run(Instant stepStart, Instant stepEnd, Duration stepDuration) {
-        current.set(voltage.get().divide(resistance.get(stepEnd)));
+    public void run(double stepStart, double stepEnd, double stepDuration) {
+        circuit.outputCurrent.set(circuit.outputVoltage.get() / resistance.get(stepEnd));
     }
 
 }

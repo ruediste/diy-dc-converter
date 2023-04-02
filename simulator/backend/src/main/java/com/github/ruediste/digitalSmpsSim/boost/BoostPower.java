@@ -1,87 +1,72 @@
 package com.github.ruediste.digitalSmpsSim.boost;
 
-import com.github.ruediste.digitalSmpsSim.quantity.Current;
-import com.github.ruediste.digitalSmpsSim.quantity.DigitalValue;
-import com.github.ruediste.digitalSmpsSim.quantity.Duration;
-import com.github.ruediste.digitalSmpsSim.quantity.Instant;
-import com.github.ruediste.digitalSmpsSim.quantity.Voltage;
+import com.github.ruediste.digitalSmpsSim.shared.PowerCircuitBase;
 import com.github.ruediste.digitalSmpsSim.simulation.CircuitElement;
-import com.github.ruediste.digitalSmpsSim.simulation.ElementInput;
-import com.github.ruediste.digitalSmpsSim.simulation.ElementOutput;
 
 public class BoostPower extends CircuitElement {
 
-    public ElementInput<Voltage> vIn = new ElementInput<>(this) {
-    };
-    public ElementInput<DigitalValue> switchIn = new ElementInput<>(this) {
-    };
-    public ElementInput<Current> iLoad = new ElementInput<>(this) {
-    };
+    private PowerCircuitBase circuit;
 
-    public ElementOutput<Voltage> vOut = new ElementOutput<>(this) {
-    };
-    public ElementOutput<Current> ilOut = new ElementOutput<>(this) {
-    };
-
-    protected BoostPower(BoostCircuit circuit) {
+    protected BoostPower(PowerCircuitBase circuit) {
         super(circuit);
+        this.circuit = circuit;
     }
 
-    public Current iL = Current.of(0);
-    public Voltage vCap = Voltage.of(0);
+    public double iL = 0;
 
     public double inductance = 150e-6;
     public double capacitance = 100e-7;
 
     @Override
     public void initialize() {
-        vOut.set(vCap);
-        ilOut.set(iL);
+
     }
 
-    private Voltage inductorVoltage() {
-        if (switchIn.get().isHigh()) {
-            return vIn.get();
+    private double inductorVoltage() {
+        var vIn = circuit.inputVoltage.get();
+        if (circuit.switchOn.get()) {
+            return vIn;
         } else {
-            return vIn.get().minus(vCap);
+            return vIn - circuit.outputVoltage.get();
         }
     }
 
     @Override
-    public void run(Instant stepStart, Instant stepEnd, Duration stepDuration) {
-        Voltage vL = inductorVoltage();
+    public void run(double stepStart, double stepEnd, double stepDuration) {
+        double vL = inductorVoltage();
 
         // V=L*di/dt; di=V*dt/L
-        var dIL = vL.value() * stepDuration.value() / inductance;
+        var dIL = vL * stepDuration / inductance;
 
         var iLOld = iL;
 
         // max: simulate diode: never let current flow backwards
-        iL = iL.add(dIL).max(0);
+        iL = Math.max(iL + dIL, 0);
 
-        Current iC;
-        if (switchIn.get().isHigh())
-            iC = Current.of(0);
+        double iC;
+        if (circuit.switchOn.get())
+            iC = 0; // no current flowing into the output when the switch is on
         else
-            iC = iL.add(iLOld).scale(0.5); // average inductor current
+            iC = (iL + iLOld) / 2; // average inductor current
 
-        iC = iC.minus(iLoad.get()); // no matter of the switch position, the load current is always drawn from the
-                                    // capacitor
+        iC = iC - circuit.outputCurrent.get(); // no matter of the switch position, the load current is always drawn
+                                               // from the
+        // capacitor
 
         // I=C*dv/dt; dv=I*dt/C
-        vCap = vCap.add(iC.value() * stepDuration.value() / capacitance);
+        double vOut = circuit.outputVoltage.get();
+        vOut += iC * stepDuration / capacitance;
 
-        vOut.set(vCap);
-        ilOut.set(iL);
+        circuit.outputVoltage.set(vOut);
     }
 
     @Override
-    public Instant stepEndTime(Instant stepStart) {
-        Voltage vL = inductorVoltage();
-        if (vL.value() < -1e-8) {
+    public Double stepEndTime(double stepStart) {
+        double vL = inductorVoltage();
+        if (vL < -1e-8) {
             // determine when the current reaches zero, to correctly handle DCM
             // V=L*di/dt; dt=L*di/V
-            return stepStart.add(-inductance * iL.value() / vL.value());
+            return stepStart - inductance * iL / vL;
         }
 
         return null;

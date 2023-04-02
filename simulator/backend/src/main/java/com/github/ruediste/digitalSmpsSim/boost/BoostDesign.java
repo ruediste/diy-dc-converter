@@ -9,37 +9,37 @@ import com.github.ruediste.digitalSmpsSim.quantity.Voltage;
 
 public class BoostDesign {
     public double switchingFrequency = 100e3;
-    public Voltage inputVoltage = Voltage.of(5);
-    public Voltage outputVoltage = Voltage.of(10);
-    public Current inputCurrent = Current.of(2);
+    public double inputVoltage = 5;
+    public double outputVoltage = 10;
+    public double inputCurrent = 2;
     public double inductorRipple = 0.5;
-    public Voltage outputRipple = Voltage.of(0.10);
+    public double outputRipple = 0.1;
 
-    public Duration switchingPeriod() {
-        return Duration.of(1 / switchingFrequency);
+    public double switchingPeriod() {
+        return 1 / switchingFrequency;
     }
 
     public double duty() {
         // Vo= Vin/(1-D); 1-D=Vin/Vo; D-1=-Vin/Vo; D=1-Vin/Vo;
-        return 1 - inputVoltage.value() / outputVoltage.value();
+        return 1 - inputVoltage / outputVoltage;
     }
 
     public double outputCapacitance() {
         // I=C*dv/dt; C=I*dt/dv
-        return outputCurrent().value() * switchingPeriod().value() * duty() / outputRipple.value();
+        return outputCurrent() * switchingPeriod() * duty() / outputRipple;
     }
 
-    public Current outputCurrent() {
-        return Current.of(inputCurrent.value() * inputVoltage.value() / outputVoltage.value());
+    public double outputCurrent() {
+        return inputCurrent * inputVoltage / outputVoltage;
     }
 
     public double inductance() {
         // V=L*di/dt; L=V*dt/di;
-        return inputVoltage.value() * switchingPeriod().value() * duty() / (inputCurrent.value() * inductorRipple);
+        return inputVoltage * switchingPeriod() * duty() / (inputCurrent * inductorRipple);
     }
 
-    public Resistance loadResistance() {
-        return outputVoltage.divide(outputCurrent());
+    public double loadResistance() {
+        return outputVoltage / outputCurrent();
     }
 
     @Override
@@ -53,8 +53,8 @@ public class BoostDesign {
     }
 
     public void applyTo(BoostCircuit circuit) {
-        circuit.power.iL = inputCurrent.scale(1 - inductorRipple / 2);
-        circuit.power.vCap = outputVoltage;
+        circuit.power.iL = inputCurrent * (1 - inductorRipple / 2);
+        circuit.outputVoltage.set( outputVoltage)
         circuit.source.voltage.set(Instant.of(0), inputVoltage);
         circuit.control.duty = duty();
         circuit.power.inductance = inductance();

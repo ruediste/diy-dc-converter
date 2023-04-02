@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "simulator/backend"
+		},
+		{
+			"path": "simulator/frontend"
+		}
+	],
+	"settings": {
+		"java.compile.nullAnalysis.mode": "automatic"
+	}
+}

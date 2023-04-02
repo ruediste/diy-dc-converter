@@ -1,27 +1,22 @@
 package com.github.ruediste.digitalSmpsSim.simulation;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import com.github.ruediste.digitalSmpsSim.quantity.Duration;
-import com.github.ruediste.digitalSmpsSim.quantity.Instant;
-
 public abstract class CircuitElement {
 
-    public List<ElementInput<?>> inputs = new ArrayList<>();
+    public Circuit circuit;
 
     protected CircuitElement(Circuit circuit) {
+        this.circuit = circuit;
         circuit.register(this);
     }
 
     public void initialize() {
     }
 
-    public Instant stepEndTime(Instant stepStart) {
+    public Double stepEndTime(double stepStart) {
         return null;
     }
 
-    public void run(Instant stepStart, Instant stepEnd, Duration stepDuration) {
+    public void run(double stepStart, double stepEnd, double stepDuration) {
 
     }
 }

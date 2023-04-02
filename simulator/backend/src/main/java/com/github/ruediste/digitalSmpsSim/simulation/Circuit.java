@@ -10,6 +10,10 @@ public class Circuit {
 
     public List<CircuitElement> elements = new ArrayList<>();
 
+    public List<SimulationValue<?>> values = new ArrayList<>();
+
+    public List<Runnable> withUpdatedValues = new ArrayList<>();
+
     public CostCalculator costCalculator = new CostCalculator(this);
 
     protected void register(CircuitElement element) {
@@ -17,13 +21,13 @@ public class Circuit {
     }
 
     public void propagateSignals() {
-        for (var element : elements) {
-            for (var input : element.inputs) {
-                input.transferValue();
-            }
-        }
+        values.forEach(v -> v.transferNextValue());
     }
 
     public void initialize() {
+    }
+
+    public void withUpdatedValues(Runnable run) {
+        this.withUpdatedValues.add(run);
     }
 }
