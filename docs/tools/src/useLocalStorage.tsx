@@ -1,3 +1,4 @@
+import React, { ReactNode, useEffect } from "react";
 import { Dispatch, SetStateAction, useState } from "react";
 
 // Hook
@@ -38,4 +39,42 @@ export default function useLocalStorage<T>(key: string, initialValue: T): [T, Di
         }
     };
     return [storedValue, setValue, () => setValue(initialValue)];
+}
+
+
+class ErrorBoundary extends React.Component<{ children: (hasError: boolean) => ReactNode }, { hasError: boolean }> {
+    constructor(props: any) {
+        super(props);
+        this.state = { hasError: false };
+    }
+
+    static getDerivedStateFromError(error: Error) {
+        return { hasError: true };
+    }
+
+    render() {
+        return this.props.children(this.state.hasError);
+    }
+}
+
+function UseMapLocalStorageHelper<T>(props: { hasError: boolean, initialValue: T, access: [T, Dispatch<SetStateAction<T>>, () => void], map: (access: [T, Dispatch<SetStateAction<T>>, () => void]) => JSX.Element }) {
+    useEffect(() => {
+        if (props.hasError) {
+            props.access[2]();
+        }
+    });
+    return props.map([props.hasError ? props.initialValue : props.access[0], props.access[1], props.access[2]]);
+}
+
+
+export function useMapLocalStorage<T>(key: string, initialValue: T, map: (access: [T, Dispatch<SetStateAction<T>>, () => void]) => JSX.Element): JSX.Element {
+    const access = useLocalStorage(key, initialValue);
+    const [resetCount, setResetCount] = useState(0);
+    return <ErrorBoundary key={resetCount}>
+        {hasError => < UseMapLocalStorageHelper access={
+            [access[0], access[1], () => {
+                setResetCount(i => i + 1);
+                access[2]();
+            }]} hasError={hasError} map={map} initialValue={initialValue} />}
+    </ErrorBoundary>
 }

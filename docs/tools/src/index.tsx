@@ -3,10 +3,12 @@ import ReactDOM from 'react-dom/client';
 import './index.scss';
 import App from './App';
 import { FirstConverter } from './FirstConverter';
+import { AdcCalculator } from './AdcCalculator';
 
 const tools: { [key: string]: () => JSX.Element } = {
   app: () => <App />,
-  first: () => <FirstConverter />
+  first: () => <FirstConverter />,
+  adcCalculator: () => <AdcCalculator />,
 };
 
 function DevSelector() {
