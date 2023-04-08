@@ -10,25 +10,20 @@ import javax.swing.*;
 import com.github.ruediste.InterfaceMessage;
 import com.github.ruediste.Datatype;
 
-public class DcmBoostPidControlMode extends Mode<DcmBoostPidControlMode.Settings> {
+public class SimpleControlMode extends Mode<SimpleControlMode.Settings> {
 
-    public DcmBoostPidControlMode() {
-        super("DCM Boost PID Control");
+    public SimpleControlMode() {
+        super("Simple Control");
     }
 
-    public static class DcmBoostPidStatusMessage implements InterfaceMessage {
+    public static class SimpleControlStatusMessage implements InterfaceMessage {
         @Datatype.uint16
-        public int adc0;
+        public int compareValue;
 
-        @Datatype.uint16
-        public int adc1;
+        public float duty;
     }
 
-    public static class DcmBoostPidConfigMessage implements InterfaceMessage {
-        public float kP;
-        public float kI;
-        public float kD;
-
+    public static class SimpleControlConfigMessage implements InterfaceMessage {
         @Datatype.uint16
         public int pwmReload;
 
@@ -36,12 +31,22 @@ public class DcmBoostPidControlMode extends Mode<DcmBoostPidControlMode.Settings
         public int pwmPrescale;
 
         @Datatype.uint16
+        public int pwmMaxCompare;
+
+        @Datatype.uint16
         public int ctrlReload;
 
         @Datatype.uint16
         public int ctrlPrescale;
 
+        @Datatype.uint16
+        public int targetAdc;
+
+        public float dutyChangeStep;
+
         public boolean running;
+
+        public byte adcSampleCycles;
     }
 
     public static class Settings implements Serializable {
@@ -51,18 +56,25 @@ public class DcmBoostPidControlMode extends Mode<DcmBoostPidControlMode.Settings
         /** in hertz */
         double frequencyControl = 10e3;
 
+        int targetAdc = 1000;
+
+        double maxDuty = 0.01;
+        double dutyChangeStep = 0.01;
+
         boolean running;
+
+        protected int adcSampleCycles;
     }
 
     @Override
-    public ModeInstance<DcmBoostPidControlMode.Settings> createInstance() {
-        return new ModeInstance<DcmBoostPidControlMode.Settings>() {
+    public ModeInstance<SimpleControlMode.Settings> createInstance() {
+        return new ModeInstance<SimpleControlMode.Settings>() {
 
             JLabel statusLabel = new JLabel();
 
             @Override
             public Component initializeImpl(Settings settings, Runnable onChange) {
-                JPanel main = new JPanel(new GridLayout(4, 2));
+                JPanel main = new JPanel(new GridLayout(8, 2));
                 main.add(new JLabel("Control Frequency [kHz]"));
                 main.add(
                         register(new JSpinner(new SpinnerNumberModel(settings.frequencyControl / 1e3, 1e-3, 500, 1e-3)),
@@ -72,6 +84,24 @@ public class DcmBoostPidControlMode extends Mode<DcmBoostPidControlMode.Settings
                 main.add(
                         register(new JSpinner(new SpinnerNumberModel(settings.frequencyPwm / 1e3, 1e-3, 500, 1e-3)),
                                 value -> settings.frequencyPwm = value * 1e3));
+
+                main.add(new JLabel("ADC Sampling Cycles"));
+                main.add(ui.registerAdcCycles(i -> settings.adcSampleCycles = i));
+
+                main.add(new JLabel("Target ADC"));
+                main.add(
+                        register(new JSpinner(new SpinnerNumberModel((float) settings.targetAdc, 0, 4095, 1)),
+                                value -> settings.targetAdc = (int) Math.round(value)));
+
+                main.add(new JLabel("Max Duty [%]"));
+                main.add(
+                        register(new JSpinner(new SpinnerNumberModel(settings.maxDuty * 100, 0, 100, 0.1)),
+                                value -> settings.maxDuty = value / 100));
+
+                main.add(new JLabel("Duty Change Step [%]"));
+                main.add(
+                        register(new JSpinner(new SpinnerNumberModel(settings.dutyChangeStep * 100, 0, 100, 1e-3)),
+                                value -> settings.dutyChangeStep = value / 100));
 
                 main.add(new JLabel("Running"));
                 var running = new JCheckBox();
@@ -90,8 +120,9 @@ public class DcmBoostPidControlMode extends Mode<DcmBoostPidControlMode.Settings
 
             @Override
             public void handle(Object msg, Settings settings) {
-                if (msg instanceof DcmBoostPidStatusMessage status) {
-                    statusLabel.setText("adc0: " + status.adc0 + " adc1: " + status.adc1);
+                if (msg instanceof SimpleControlStatusMessage status) {
+                    statusLabel.setText("Compare Value: " + status.compareValue + " Duty [%]: "
+                            + String.format("%.1f", status.duty * 100));
                 }
 
             }
@@ -99,17 +130,21 @@ public class DcmBoostPidControlMode extends Mode<DcmBoostPidControlMode.Settings
             @Override
             public Object toConfigMessage(Settings settings) {
                 var calc = new PwmValuesCalculator();
-                var msg = new DcmBoostPidConfigMessage();
+                var msg = new SimpleControlConfigMessage();
                 {
                     var controlPwm = calc.calculate(settings.frequencyControl, 0);
                     msg.ctrlReload = (int) controlPwm.reload;
                     msg.ctrlPrescale = (int) controlPwm.prescale;
                 }
                 {
-                    var pwm = calc.calculate(settings.frequencyPwm, 0);
+                    var pwm = calc.calculate(settings.frequencyPwm, settings.maxDuty);
                     msg.pwmReload = (int) pwm.reload;
                     msg.pwmPrescale = (int) pwm.prescale;
+                    msg.pwmMaxCompare = (int) pwm.compare;
                 }
+                msg.targetAdc = settings.targetAdc;
+                msg.dutyChangeStep = (float) settings.dutyChangeStep;
+                msg.adcSampleCycles = (byte) settings.adcSampleCycles;
                 msg.running = settings.running;
                 return msg;
             }

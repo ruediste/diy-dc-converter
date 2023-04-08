@@ -3,6 +3,7 @@ package com.github.ruediste;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -95,7 +96,18 @@ public class InterfaceLoader {
                             return value == 1;
                         });
                     }
+                    if (field.getTypeDescriptorStr().equals("B") || field.getTypeDescriptorStr().equals("[B")) {
+                        typeFound = true;
+                        interfaceField.setType("uint8_t", 1, (obj, out) -> {
+                            byte value = (byte) obj;
+                            out.write(value);
+                        }, in -> {
+                            return (byte) in.read();
+                        });
+                    }
                     for (var annotation : field.getAnnotationInfo()) {
+                        if (Datatype.array.class.getName().equals(annotation.getName()))
+                            continue;
                         if (typeFound) {
                             throw new RuntimeException(
                                     "Multiple annotations found on " + info.getName() + "." + field.getName());
@@ -109,33 +121,36 @@ public class InterfaceLoader {
                             }, in -> {
                                 return in.read() | in.read() << 8;
                             });
-                        } else if (Datatype.array.class.getName().equals(annotation.getName())) {
-                            int size = (int) annotation.getParameterValues().get("value").getValue();
-                            interfaceField.arraySize = size;
-                            if (field.getTypeDescriptorStr().equals("[B")) {
-                                interfaceField.setType("uint8_t", size, (obj, out) -> {
-                                    var value = (byte[]) obj;
-                                    if (value.length != size)
-                                        throw new RuntimeException("Array length mismatch. Expected " + size
-                                                + ", received " + value.length);
-                                    out.write(value);
-                                }, in -> {
-                                    return in.readNBytes(size);
-                                });
-                            } else
-                                throw new RuntimeException(
-                                        "Unknown array type: " + info.getName() + "."
-                                                + field.getName() + " type: " + field.getTypeDescriptorStr());
                         } else {
                             throw new RuntimeException("Unknown annotation " + annotation.getName() + " on "
                                     + info.getName() + "." + field.getName());
                         }
                         typeFound = true;
                     }
+
                     if (!typeFound) {
                         throw new RuntimeException(
                                 "No type annotation found and no known type: " + info.getName() + "."
                                         + field.getName() + " type: " + field.getTypeDescriptorStr());
+                    }
+                    for (var annotation : field.getAnnotationInfo()) {
+                        if (Datatype.array.class.getName().equals(annotation.getName())) {
+                            int size = (int) annotation.getParameterValues().get("value").getValue();
+                            interfaceField.arraySize = size;
+                            interfaceField.cSize *= size;
+                            var origReader = interfaceField.reader;
+                            interfaceField.reader = in -> {
+                                var arr = Array.newInstance(interfaceField.field.getType().componentType(), size);
+                                for (int i = 0; i < size; i++)
+                                    Array.set(arr, i, origReader.read(in));
+                                return arr;
+                            };
+                            var origWriter = interfaceField.writer;
+                            interfaceField.writer = (obj, out) -> {
+                                for (int i = 0; i < size; i++)
+                                    origWriter.write(Array.get(obj, i), out);
+                            };
+                        }
                     }
                 }
             }

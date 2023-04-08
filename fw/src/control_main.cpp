@@ -4,39 +4,6 @@
 #include "main.h"
 #include "USB_DEVICE/App/usbd_cdc_if.h"
 
-namespace ControlMain
-{
-    void dummyControlHandler()
-    {
-    }
-    void dummyMainHandler()
-    {
-    }
-
-    void (*controlHandler)() = dummyControlHandler;
-    void (*mainHandler)() = dummyMainHandler;
-}
-
-namespace PWMMode
-{
-    void handle(PWMModeConfigMessage *config)
-    {
-        htim1.Instance->ARR = config->reload;
-        htim1.Instance->CCR1 = config->compare;
-        htim1.Instance->PSC = config->prescale;
-
-        if (config->running)
-        {
-            HAL_TIM_Base_Start(&htim1);
-            HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-        }
-        else
-        {
-            HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
-        }
-    }
-}
-
 template <typename T>
 struct MessageBuffer
 {
@@ -54,10 +21,207 @@ struct MessageBuffer
     }
 };
 
+namespace ControlMain
+{
+    void dummyControlHandler()
+    {
+    }
+    void dummyMainHandler()
+    {
+    }
+
+    void (*controlHandler)() = dummyControlHandler;
+    void (*mainHandler)() = dummyMainHandler;
+
+    void reset()
+    {
+        HAL_ADC_Stop_DMA(&hadc1);
+        HAL_TIM_Base_Stop(&htim1);
+        HAL_TIM_Base_Stop(&htim9);
+        controlHandler = dummyControlHandler;
+        mainHandler = dummyMainHandler;
+        // set to 10kHz
+        TIM1->PSC = 0;
+        TIM1->ARR = 8400;
+        // 1% duty
+        TIM1->CCR1 = 84;
+        // trigger ADC conversion at start of cycle
+        TIM1->CCR3 = 0;
+
+        // set to 10kHz
+        TIM9->PSC = 0;
+        TIM9->ARR = 8400;
+    }
+
+    const int adcChannelCount = 2;
+    const int adcBufCount = adcChannelCount * 4;
+    uint16_t adcBuf[adcBufCount];
+
+    void startStopPWMOutput(bool running)
+    {
+        if (running)
+        {
+            HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+        }
+        else
+        {
+            HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+        }
+    }
+
+    void setAdcSampleCycles(uint8_t value)
+    {
+        ADC1->SMPR2 &= ~0x1FF;
+        ADC1->SMPR2 |= value | (value << 3);
+    }
+
+    void startTimers()
+    {
+        HAL_TIM_Base_Start(&htim1);
+        HAL_TIM_OC_Start(&htim1, TIM_CHANNEL_3);
+
+        HAL_TIM_Base_Start_IT(&htim9);
+
+        for (int i = 0; i < adcBufCount; i++)
+            adcBuf[i] = 0;
+
+        HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adcBuf, adcBufCount);
+    }
+
+    void readADCValues(int nAvg, uint16_t adcValues[adcChannelCount])
+    {
+        int adcCounts[adcChannelCount] = {0};
+        for (int i = 0; i < adcChannelCount; i++)
+            adcValues[i] = 0;
+
+        // do this quickly in one go
+        __disable_irq();
+        // find the offset in the buffer where the next value will be written by DMA
+        // we'll skip this offset when copying
+        int offset = adcBufCount - DMA2_Stream0->NDTR;
+        for (int i = adcBufCount - nAvg * adcChannelCount; i < adcBufCount; i++)
+        {
+            auto value = adcBuf[(i + offset) % adcBufCount];
+            adcValues[(i + offset) % adcChannelCount] += value;
+            adcCounts[(i + offset) % adcChannelCount]++;
+        }
+        __enable_irq();
+
+        for (int i = 0; i < adcChannelCount; i++)
+            adcValues[i] /= adcCounts[i];
+    }
+}
+
+namespace PWMMode
+{
+    uint32_t lastStatusSend = 0;
+    void main()
+    {
+        auto now = HAL_GetTick();
+        if (now - lastStatusSend > 500)
+        {
+            lastStatusSend = now;
+
+            {
+                MessageBuffer<DebugMessage> buf(MessageType::DebugMessage);
+                uint32_t *buf2 = (uint32_t *)buf.msg.data;
+                buf2[0] = ADC1->SMPR1;
+                buf2[1] = ADC1->SMPR2;
+                buf2[2] = 0;
+                buf2[3] = 0;
+                while (CDC_Transmit_FS(buf.bytes(), sizeof(buf)) == USBD_BUSY)
+                    ;
+            }
+        }
+    }
+
+    void handle(PWMModeConfigMessage *config)
+    {
+        TIM1->ARR = config->reload;
+        TIM1->CCR1 = config->compare;
+        TIM1->CCR3 = config->adcTrigger;
+        TIM1->PSC = config->prescale;
+        ControlMain::mainHandler = main;
+
+        ControlMain::setAdcSampleCycles(config->adcSampleCycles);
+        ControlMain::startTimers();
+        ControlMain::startStopPWMOutput(config->running);
+    }
+}
+
+namespace SimpleControlMode
+{
+
+    uint16_t pwmMaxCompare;
+    uint16_t targetAdc;
+    float dutyChangeStep;
+    float duty = 0;
+
+    void control()
+    {
+        uint16_t adcValues[ControlMain::adcChannelCount];
+        ControlMain::readADCValues(2, adcValues);
+        if (adcValues[0] < targetAdc)
+            duty += dutyChangeStep;
+        else
+            duty -= dutyChangeStep;
+        if (duty < 0)
+        {
+            duty = 0;
+        }
+        uint16_t compareValue = duty * TIM1->ARR;
+        if (compareValue > pwmMaxCompare)
+        {
+            compareValue = pwmMaxCompare;
+            duty = pwmMaxCompare / (double)TIM1->ARR;
+        }
+        TIM1->CCR1 = compareValue;
+    }
+
+    uint32_t lastStatusSend = 0;
+    void main()
+    {
+        auto now = HAL_GetTick();
+        if (now - lastStatusSend > 500)
+        {
+            lastStatusSend = now;
+            {
+                MessageBuffer<SimpleControlStatusMessage> buf(MessageType::SimpleControlStatusMessage);
+                buf.msg.compareValue = TIM1->CCR1;
+                buf.msg.duty = duty;
+                while (CDC_Transmit_FS(buf.bytes(), sizeof(buf)) == USBD_BUSY)
+                    ;
+            }
+        }
+    }
+
+    void handle(SimpleControlConfigMessage *config)
+    {
+        TIM1->ARR = config->pwmReload;
+        TIM1->PSC = config->pwmPrescale;
+        TIM1->CCR1 = 0;
+        TIM1->CCR3 = 10;
+
+        TIM9->PSC = config->ctrlPrescale;
+        TIM9->ARR = config->ctrlReload;
+
+        pwmMaxCompare = config->pwmMaxCompare;
+        dutyChangeStep = config->dutyChangeStep;
+        targetAdc = config->targetAdc;
+        // duty = 0;
+
+        ControlMain::setAdcSampleCycles(config->adcSampleCycles);
+        ControlMain::controlHandler = control;
+        ControlMain::mainHandler = main;
+
+        ControlMain::startTimers();
+        ControlMain::startStopPWMOutput(config->running);
+    }
+}
+
 namespace DcmBoostPid
 {
-    const int adcBufCount = 8;
-    uint16_t adcBuf[adcBufCount];
+
     volatile int controlCount;
 
     void control()
@@ -76,29 +240,10 @@ namespace DcmBoostPid
             {
                 MessageBuffer<DcmBoostPidStatusMessage> buf(MessageType::DcmBoostPidStatusMessage);
 
-                uint16_t adc0 = 0;
-                int adc0Count = 0;
-                uint16_t adc1 = 0;
-                int adc1Count = 0;
-                __disable_irq();
-                int offset = adcBufCount - DMA2_Stream0->NDTR;
-                for (int i = 1; i < adcBufCount; i++)
-                {
-                    auto value = adcBuf[(i + offset) % adcBufCount];
-                    if ((i % 2) == 0)
-                    {
-                        adc0 += value + 1;
-                        adc0Count++;
-                    }
-                    if ((i % 2) == 1)
-                    {
-                        adc1 += value;
-                        adc1Count++;
-                    }
-                }
-                __enable_irq();
-                buf.msg.adc0 = adc0 / adc0Count;
-                buf.msg.adc1 = adc1 / adc1Count; // + controlCount;
+                uint16_t adcValues[ControlMain::adcChannelCount];
+                ControlMain::readADCValues(2, adcValues);
+                buf.msg.adc0 = adcValues[0];
+                buf.msg.adc1 = adcValues[1];
                 while (CDC_Transmit_FS(buf.bytes(), sizeof(buf)) == USBD_BUSY)
                     ;
             }
@@ -120,51 +265,28 @@ namespace DcmBoostPid
 
     void handle(DcmBoostPidConfigMessage *config)
     {
-        htim1.Instance->ARR = config->reloadPwm;
-        htim1.Instance->PSC = config->prescalePwm;
-        htim1.Instance->CCR1 = config->reloadPwm / 8;
-        htim1.Instance->CCR3 = 10;
+        TIM1->ARR = config->pwmReload;
+        TIM1->PSC = config->pwmPrescale;
+        TIM1->CCR1 = config->pwmReload / 8;
+        TIM1->CCR3 = 10;
 
-        htim9.Instance->ARR = config->reloadCtrl;
-        htim9.Instance->PSC = config->prescaleCtrl;
+        TIM9->PSC = config->ctrlPrescale;
+        TIM9->ARR = config->ctrlReload;
 
         ControlMain::controlHandler = control;
         ControlMain::mainHandler = main;
         controlCount = 0;
 
-        if (config->running)
-        {
-            HAL_TIM_Base_Start(&htim1);
-            HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-            HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
-
-            HAL_TIM_Base_Start_IT(&htim9);
-
-            for (int i = 0; i < adcBufCount; i++)
-                adcBuf[i] = 0;
-
-            HAL_ADC_Start_DMA(&hadc1, (uint32_t *)adcBuf, adcBufCount /*sizeof(adcBuf)*/);
-            // HAL_ADC_Start(&hadc1);
-        }
-        else
-        {
-            HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
-        }
+        ControlMain::startTimers();
+        ControlMain::startStopPWMOutput(config->running);
     }
 }
 
 namespace ControlMain
 {
+    bool started = false;
     uint8_t aggregationBuffer[maxMessageSize + 1];
     uint32_t index = 0;
-
-    void reset()
-    {
-        HAL_TIM_Base_Stop(&htim1);
-        HAL_TIM_Base_Stop(&htim9);
-        controlHandler = dummyControlHandler;
-        mainHandler = dummyMainHandler;
-    }
 
     void handleMessage(uint8_t messageType)
     {
@@ -177,10 +299,14 @@ namespace ControlMain
         case MessageType::DcmBoostPidConfigMessage:
             DcmBoostPid::handle((DcmBoostPidConfigMessage *)(aggregationBuffer + 1));
             break;
+        case MessageType::SimpleControlConfigMessage:
+            SimpleControlMode::handle((SimpleControlConfigMessage *)(aggregationBuffer + 1));
+            break;
 
         default:
             break;
         }
+        started = true;
     }
 
     void receiveData(uint8_t *buf, uint32_t *len)
@@ -218,9 +344,23 @@ namespace ControlMain
         controlHandler();
     }
 
+    uint32_t lastStatusSend = 0;
     void controlMain()
     {
         mainHandler();
+
+        auto now = HAL_GetTick();
+        if (started && now - lastStatusSend > 500)
+        {
+            lastStatusSend = now;
+
+            {
+                MessageBuffer<AdcValuesMessage> buf(MessageType::AdcValuesMessage);
+                readADCValues(1, buf.msg.values);
+                while (CDC_Transmit_FS(buf.bytes(), sizeof(buf)) == USBD_BUSY)
+                    ;
+            }
+        }
     }
 }
 

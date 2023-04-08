@@ -4,6 +4,7 @@
         "hadc",
         "htim",
         "NDTR",
-        "prescale"
+        "prescale",
+        "SMPR"
     ]
 }

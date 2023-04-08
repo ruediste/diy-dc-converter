@@ -4,6 +4,7 @@ import java.awt.Component;
 import java.io.Serializable;
 import java.util.function.Consumer;
 
+import javax.swing.JComboBox;
 import javax.swing.JSpinner;
 
 import com.github.ruediste.Listeners;
@@ -17,6 +18,7 @@ public abstract class Mode<TSettings extends Serializable> {
 
     public abstract static class ModeInstance<TSettings extends Serializable> {
         protected Listeners inputChanged = new Listeners();
+        protected ModeUiUtil ui = new ModeUiUtil(inputChanged);
 
         public final Component initialize(TSettings settings, Runnable onChange) {
             inputChanged.register(onChange);
@@ -28,6 +30,21 @@ public abstract class Mode<TSettings extends Serializable> {
         public abstract Object toConfigMessage(TSettings settings);
 
         protected JSpinner register(JSpinner spinner, Consumer<Double> setter) {
+            return ui.register(spinner, setter);
+        }
+
+        public void handle(Object msg, TSettings settings) {
+        }
+    }
+
+    public static class ModeUiUtil {
+        private Listeners inputChanged;
+
+        ModeUiUtil(Listeners inputChanged) {
+            this.inputChanged = inputChanged;
+        }
+
+        public JSpinner register(JSpinner spinner, Consumer<Double> setter) {
             spinner.addChangeListener(e -> {
                 setter.accept((Double) spinner.getValue());
                 inputChanged.trigger();
@@ -35,8 +52,16 @@ public abstract class Mode<TSettings extends Serializable> {
             return spinner;
         }
 
-        public void handle(Object msg) {
+        public JComboBox<String> registerAdcCycles(Consumer<Integer> setter) {
+            var labels = new String[] { "3", "15", "28", "56", "84", "112", "144", "480" };
+            var box = new JComboBox<String>(labels);
+            box.addActionListener(e -> {
+                setter.accept(box.getSelectedIndex());
+                inputChanged.trigger();
+            });
+            return box;
         }
+
     }
 
     public abstract TSettings createDefaultSettings();

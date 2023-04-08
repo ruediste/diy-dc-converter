@@ -1,5 +1,7 @@
 package com.github.ruediste;
 
+import java.awt.Dimension;
+import java.awt.GridLayout;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
@@ -55,6 +57,8 @@ public class App {
 
     JPanel modeContainer;
     JCheckBox autoSend;
+    JLabel[] debugLabels = new JLabel[4];
+    JLabel adcValuesLabel = new JLabel();
 
     private class ModeInstanceController<TSettings extends Serializable> {
         ModeInstance<TSettings> instance;
@@ -102,7 +106,7 @@ public class App {
         }
 
         public void handle(Object msg) {
-            instance.handle(msg);
+            instance.handle(msg, settings);
         }
     }
 
@@ -133,7 +137,16 @@ public class App {
         var in = con.getIn();
         readLoop = new LoopingThread("Read Loop", () -> {
             var msg = interfaceSerializer.deserialize(in);
-            SwingUtilities.invokeLater(() -> modeInstanceController.handle(msg));
+            SwingUtilities.invokeLater(() -> {
+                if (msg instanceof DebugMessage dbg) {
+                    for (int i = 0; i < debugLabels.length; i++) {
+                        debugLabels[i].setText(RealSerialConnection.hexDump(dbg.data, i * 4, 4));
+                    }
+                } else if (msg instanceof AdcValuesMessage adc) {
+                    adcValuesLabel.setText("ADC0: " + adc.values[0] + " ADC1: " + adc.values[1]);
+                } else
+                    modeInstanceController.handle(msg);
+            });
         }, in::close);
     }
 
@@ -209,6 +222,21 @@ public class App {
             modeComboBox.setSelectedIndex(index);
             showMode(modes.get(index));
         }
+
+        // debug labels
+        {
+            JPanel debugContainer = new JPanel(new GridLayout(debugLabels.length, 2));
+            for (int i = 0; i < debugLabels.length; i++) {
+                debugContainer.add(new JLabel("Debug " + i));
+                debugLabels[i] = new JLabel();
+                debugContainer.add(debugLabels[i]);
+            }
+            JPanel wrapper = new JPanel();
+            wrapper.add(debugContainer);
+            mainPanel.add(debugContainer);
+        }
+
+        mainPanel.add(adcValuesLabel);
 
         // Display the window.
         frame.pack();
