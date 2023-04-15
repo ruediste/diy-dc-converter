@@ -21,7 +21,11 @@ public class Load extends CircuitElement {
 
     @Override
     public void run(double stepStart, double stepEnd, double stepDuration) {
-        circuit.outputCurrent.set(circuit.outputVoltage.get() / resistance.get(stepEnd));
+        circuit.outputCurrent.set(calculateCurrent(circuit.outputVoltage.get(), stepEnd));
+    }
+
+    public double calculateCurrent(double voltage, double instant) {
+        return voltage / resistance.get(instant);
     }
 
 }

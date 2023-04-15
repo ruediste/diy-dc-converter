@@ -15,21 +15,26 @@ public class HardwareTimer extends CircuitElement {
         this(element, null);
     }
 
-    protected HardwareTimer(CircuitElement element, Runnable onOverflow) {
+    protected HardwareTimer(CircuitElement element, TimerCallback onOverflow) {
         super(element.circuit);
-        this.onOverflow = onOverflow;
+        this.onReload = onOverflow;
+    }
+
+    public interface TimerCallback {
+        public void run(double instant);
     }
 
     public double clockFrequency;
 
-    public long overflow;
+    public long prescale;
+    public long reload;
 
-    public Runnable onOverflow;
+    public TimerCallback onReload;
 
     public static class Channel {
         public long compare;
 
-        public Runnable onCompare;
+        public TimerCallback onCompare;
 
         private double nextCompareMatchInstant;
         private boolean matched;
@@ -40,8 +45,8 @@ public class HardwareTimer extends CircuitElement {
     private double nextCycleStart;
 
     private void updateInstants() {
-        var clockPeriod = 1 / clockFrequency;
-        nextCycleStart = lastCycleStart + clockPeriod * overflow;
+        var clockPeriod = prescale * 1 / clockFrequency;
+        nextCycleStart = lastCycleStart + clockPeriod * reload;
         for (var channel : channels) {
             channel.nextCompareMatchInstant = lastCycleStart + clockPeriod * channel.compare;
             channel.matched = false;
@@ -72,19 +77,19 @@ public class HardwareTimer extends CircuitElement {
     public void run(double stepStart, double stepEnd, double stepDuration) {
         for (var channel : channels) {
             if (!channel.matched && stepEnd >= channel.nextCompareMatchInstant) {
-                channel.onCompare.run();
+                channel.onCompare.run(stepEnd);
                 channel.matched = true;
             }
         }
         if (stepEnd <= nextCycleStart) {
-            if (onOverflow != null)
-                onOverflow.run();
+            if (onReload != null)
+                onReload.run(stepEnd);
             lastCycleStart = nextCycleStart;
             updateInstants();
         }
     }
 
-    public Channel createChannel(Runnable onCompare) {
+    public Channel createChannel(TimerCallback onCompare) {
         var result = new Channel();
         result.onCompare = onCompare;
         channels.add(result);

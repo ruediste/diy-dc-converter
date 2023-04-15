@@ -1,33 +1,35 @@
 package com.github.ruediste.digitalSmpsSim.boost;
 
-import com.github.ruediste.digitalSmpsSim.quantity.Current;
-import com.github.ruediste.digitalSmpsSim.quantity.Instant;
-import com.github.ruediste.digitalSmpsSim.quantity.Voltage;
-import com.github.ruediste.digitalSmpsSim.simulation.ElementOutput;
+import java.util.List;
+import java.util.function.Consumer;
+import java.util.function.Supplier;
 
-import uk.me.berndporr.iirj.ChebyshevI;
+import com.github.ruediste.digitalSmpsSim.optimization.Optimizer;
+import com.github.ruediste.digitalSmpsSim.shared.PowerCircuitBase;
+import com.github.ruediste.digitalSmpsSim.shared.PwmValuesCalculator;
+import com.github.ruediste.digitalSmpsSim.simulation.StepChangingValue;
 
-public class BoostControlPID extends BoostControlBase {
+public class BoostControlPID extends ControlBase<BoostCircuit> {
 
-    public ElementOutput<Voltage> errorOut = new ElementOutput<>(this) {
-    };
-    public ElementOutput<Current> di = new ElementOutput<>(this) {
-    };
-
-    protected BoostControlPID(BoostCircuit circuit) {
+    public BoostControlPID(BoostCircuit circuit) {
         super(circuit);
     }
+
+    public StepChangingValue<Double> targetVoltage = new StepChangingValue<>();
 
     public double kP = 0.136;
     public double kI = 0.0049;
     public double kD = 3.5;
 
+    public double switchingFrequency = 100e3;
+    public double controlFrequency = 10e3;
+
     public double lowPass = 4;
 
     double integral;
 
-    ChebyshevI vOutFilter = new ChebyshevI();
-    ChebyshevI vOutFilterSlow = new ChebyshevI();
+    // ChebyshevI vOutFilter = new ChebyshevI();
+    // ChebyshevI vOutFilterSlow = new ChebyshevI();
 
     boolean firstRun = true;
 
@@ -35,69 +37,100 @@ public class BoostControlPID extends BoostControlBase {
     public void initialize() {
         super.initialize();
 
-        integral = kI == 0 ? 0 : -duty / kI;
-        vOutFilter.lowPass(3, circuit.switchingFrequency, circuit.switchingFrequency / lowPass, 1);
-        vOutFilterSlow.lowPass(3, circuit.switchingFrequency, circuit.switchingFrequency / (2 * lowPass), 1);
-        errorOut.set(Voltage.of(0));
-        di.set(Current.of(0));
+        var calc = new PwmValuesCalculator();
+        {
+            var values = calc.calculate(switchingFrequency, 0.1);
+            pwmTimer.prescale = values.prescale;
+            pwmTimer.reload = values.reload;
+            pwmChannel.compare = values.compare;
+            adcChannel.compare = 0;
+        }
+        {
+            var values = calc.calculate(controlFrequency, 0.1);
+            controlTimer.prescale = values.prescale;
+            controlTimer.reload = values.reload;
+        }
+
+        // vOutFilter.lowPass(3, circuit.switchingFrequency, circuit.switchingFrequency
+        // / lowPass, 1);
+        // vOutFilterSlow.lowPass(3, circuit.switchingFrequency,
+        // circuit.switchingFrequency / (2 * lowPass), 1);
+
+        controlTimer.onReload = this::control;
     }
 
-    Voltage lastOutputVoltage = Voltage.of(0);
+    double lastOutputVoltage;
 
-    @Override
-    protected void updateDuty(Instant currentTime) {
-        if (firstRun) {
-            firstRun = false;
-            lastOutputVoltage = outputVoltage.get();
-            for (int i = 0; i < 1000; i++) {
-                vOutFilter.filter(outputVoltage.get().value());
-                vOutFilterSlow.filter(outputVoltage.get().value());
-            }
+    private void control(double instant) {
+
+        double outAvg = circuit.outputVoltage.get();
+        double outAvgSlow = lastOutputVoltage;
+
+        double errorP = outAvg / targetVoltage.get(instant) - 1;
+        if (kI != 0) {
+            integral += errorP;
+            integral = Math.max(-1 / kI, Math.min(1 / kI, integral));
         }
 
-        // PID
-        {
-            double outAvg = vOutFilter.filter(outputVoltage.get().value());
-            double outAvgSlow = vOutFilterSlow.filter(outputVoltage.get().value());
+        double diff = (outAvg - outAvgSlow) / targetVoltage.get(instant);
 
-            double errorP = outAvg / targetVoltage.get(currentTime).value() - 1;
-            if (kI != 0) {
-                integral += errorP;
-                integral = Math.max(-1 / kI, Math.min(1 / kI, integral));
-            }
-
-            double diff = (outAvg - outAvgSlow) / targetVoltage.get(currentTime).value();
-
-            duty = -(errorP * kP + integral * kI + diff * kD);
-
-            errorOut.set(Voltage.of(errorP));
-        }
-
-        // voltage change feed forward
-        if (false) {
-            double voltageChange = outputVoltage.get().value() - lastOutputVoltage.value();
-
-            // average current required to explain the change in output voltage
-            double dI = circuit.power.capacitance * voltageChange
-                    / circuit.switchingPeriod();
-            di.set(Current.of(dI));
-
-            // required duty the average inductor current by the dI (peak current
-            // change times two)
-            double dt = 2 * circuit.power.inductance * dI / outputVoltage.get().value();
-
-            double dd = dt / circuit.switchingPeriod();
-
-            if ((voltageChange < 0 && outputVoltage.get().value() < targetVoltage.get(currentTime).value())
-                    || (voltageChange > 0 && outputVoltage.get().value() > targetVoltage.get(currentTime).value())) {
-
-                duty -= dd;
-            }
-        }
+        duty = -(errorP * kP + integral * kI + diff * kD);
 
         duty = Math.max(0.01, Math.min(duty, 0.99));
 
-        lastOutputVoltage = outputVoltage.get();
+        pwmChannel.compare = (long) duty * pwmTimer.reload;
+
+        lastOutputVoltage = circuit.outputVoltage.get();
     }
 
+    public <T extends PowerCircuitBase> Consumer<T> optimize(List<Supplier<T>> circuitSuppliers) {
+        var optimizer = new Optimizer();
+        return optimizer.optimize(
+                List.of(
+                        new Optimizer.OptimizationParameter<BoostControlPID>("kP", Math.log(kD), 5, -10, 10,
+                                (c, v) -> c.kP = Math.exp(v)),
+                        new Optimizer.OptimizationParameter<BoostControlPID>("kI", Math.log(kD), 5, -10, 10,
+                                (c, v) -> c.kI = Math.exp(v)),
+                        new Optimizer.OptimizationParameter<BoostControlPID>("kD", Math.log(kD), 5, -10, 10,
+                                (c, v) -> c.kD = Math.exp(v))),
+                circuitSuppliers);
+    }
+
+    @Override
+    public double targetValue(double instant) {
+        return targetVoltage.get(instant);
+    }
+
+    @Override
+    public double actualValue() {
+        return circuit.outputVoltage.get();
+    }
+
+    @Override
+    public String parameterInfo() {
+        return String.format("kP: %f kI: %f kD: %f", kP, kI, kD);
+    }
+
+    @Override
+    public double simulationDuration() {
+        return 200 / controlFrequency;
+    }
+
+    @Override
+    public double eventTime() {
+        return 5 / controlFrequency;
+    }
+
+    @Override
+    public void initializeSteadyState() {
+        var calc = new BoostDutyCalculator();
+        calc.inductance = circuit.power.inductance;
+        calc.inputVoltage = circuit.source.voltage.get(0);
+        calc.outputVoltage = targetVoltage.get(0);
+        calc.outputCurrent = circuit.load.calculateCurrent(calc.outputVoltage, 0);
+        calc.switchingFrequency = switchingFrequency;
+        var result = calc.calculate();
+        duty = result.duty;
+        integral = -duty / kI;
+    }
 }

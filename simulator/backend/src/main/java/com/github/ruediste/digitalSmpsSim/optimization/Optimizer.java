@@ -3,6 +3,7 @@ package com.github.ruediste.digitalSmpsSim.optimization;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -18,20 +19,43 @@ import org.apache.commons.math3.optim.nonlinear.scalar.ObjectiveFunction;
 import org.apache.commons.math3.optim.nonlinear.scalar.noderiv.CMAESOptimizer;
 import org.apache.commons.math3.random.JDKRandomGenerator;
 
-import com.github.ruediste.digitalSmpsSim.boost.BoostCircuit;
+import com.github.ruediste.digitalSmpsSim.boost.ControlBase;
+import com.github.ruediste.digitalSmpsSim.shared.PowerCircuitBase;
 import com.github.ruediste.digitalSmpsSim.simulation.Simulator;
 
 public class Optimizer {
-    private void apply(BoostCircuit circuit, double[] point) {
-        circuit.control.kP = Math.exp(point[0]);
-        circuit.control.kI = Math.exp(point[1]);
-        circuit.control.kD = Math.exp(point[2]);
-        // circuit.control.lowPass = Math.exp(Math.max(-5, point[3])) + 2;
+
+    public static class OptimizationParameter<TControl> {
+        public String name;
+        public double initialGuess;
+        public double sigma;
+        public double lowerBound;
+        public double upperBound;
+        public BiConsumer<TControl, Double> apply;
+
+        public OptimizationParameter(String name, double initialGuess, double sigma, double lowerBound,
+                double upperBound, BiConsumer<TControl, Double> apply) {
+            this.name = name;
+            this.initialGuess = initialGuess;
+            this.sigma = sigma;
+            this.lowerBound = lowerBound;
+            this.upperBound = upperBound;
+            this.apply = apply;
+        }
+
     }
 
-    public Consumer<BoostCircuit> optimize(BoostCircuit initialCircuit,
-            List<Supplier<BoostCircuit>> circuitSuppliers,
-            long simulationPeriods) {
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    private void apply(PowerCircuitBase circuit, List<OptimizationParameter> parameters, double[] point) {
+        for (int i = 0; i < point.length; i++) {
+            parameters.get(i).apply.accept(circuit.control, point[i]);
+        }
+    }
+
+    @SuppressWarnings({ "rawtypes", "unchecked" })
+    public <TCircuit extends PowerCircuitBase, TControl extends ControlBase<?>> Consumer<TCircuit> optimize(
+            List<OptimizationParameter<TControl>> parameters,
+            List<Supplier<TCircuit>> circuitSuppliers) {
         Simulator sim = new Simulator();
         // PowellOptimizer opt = new PowellOptimizer(1e-3, 1e-8);
         var opt = new CMAESOptimizer(10000, 0, false, 10, 10, new JDKRandomGenerator(0), false,
@@ -44,8 +68,8 @@ public class Optimizer {
                 public double value(double[] point) {
                     return circuitSuppliers.stream().map(circuitSupplier -> pool.submit(() -> {
                         var circuit = circuitSupplier.get();
-                        apply(circuit, point);
-                        sim.simulate(circuit, circuit.switchingPeriod() * simulationPeriods);
+                        apply(circuit, (List) parameters, point);
+                        sim.simulate(circuit, circuit.control.simulationDuration());
                         return circuit.costCalculator.totalCost;
                     })).toList().stream().collect(Collectors.summingDouble(x -> {
                         try {
@@ -56,17 +80,13 @@ public class Optimizer {
                     }));
                 }
             }), new InitialGuess(
-                    new double[] {
-                            Math.log(initialCircuit.control.kP),
-                            Math.log(initialCircuit.control.kI),
-                            Math.log(initialCircuit.control.kD),
-                    // Math.log(initialCircuit.control.lowPass - 2),
-                    }),
+                    parameters.stream().mapToDouble(x -> x.initialGuess).toArray()),
                     new MaxIter(1000), new MaxEval(1000),
                     new CMAESOptimizer.PopulationSize(15),
-                    new CMAESOptimizer.Sigma(new double[] { 5, 5, 5 }),
-                    new SimpleBounds(new double[] { -10, -10, -10 }, new double[] { 10, 10, 10 }));
-            return circuit -> apply(circuit, result.getPoint());
+                    new CMAESOptimizer.Sigma(parameters.stream().mapToDouble(x -> x.sigma).toArray()),
+                    new SimpleBounds(parameters.stream().mapToDouble(x -> x.lowerBound).toArray(),
+                            parameters.stream().mapToDouble(x -> x.upperBound).toArray()));
+            return circuit -> apply(circuit, (List) parameters, result.getPoint());
         } finally {
             pool.shutdownNow();
         }

@@ -7,19 +7,15 @@ import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.github.ruediste.digitalSmpsSim.PlotRest.PlotGroup;
-import com.github.ruediste.digitalSmpsSim.quantity.Duration;
-import com.github.ruediste.digitalSmpsSim.quantity.HasUnit;
-import com.github.ruediste.digitalSmpsSim.quantity.Instant;
 import com.github.ruediste.digitalSmpsSim.quantity.SiPrefix;
 import com.github.ruediste.digitalSmpsSim.quantity.SiPrefixRest;
 import com.github.ruediste.digitalSmpsSim.quantity.SiPrefixRest.SiPrefixPMod;
 import com.github.ruediste.digitalSmpsSim.quantity.Unit;
-import com.google.common.reflect.TypeToken;
 
 public class Plot {
-    public Duration samplePeriod;
-    public Instant start;
-    public Instant end;
+    public double samplePeriod;
+    public Double start;
+    public Double end;
     public String title;
 
     public SiPrefixPMod timePrefix;
@@ -58,7 +54,7 @@ public class Plot {
     }
 
     public static class PlotValues {
-        public Instant time;
+        public double time;
         public List<Double> values = new ArrayList<>();
     }
 
@@ -66,38 +62,24 @@ public class Plot {
         this.plotGroup = plotGroup;
     }
 
-    public <T> Plot add(String name, Plottable plottable) {
-        Class<?> quantityCls = null;
-        if (plottable instanceof ElementOutput) {
-            quantityCls = TypeToken.of(plottable.getClass()).resolveType(ElementOutput.class.getTypeParameters()[0])
-                    .getRawType();
-        } else if (plottable instanceof ElementInput) {
-            quantityCls = TypeToken.of(plottable.getClass()).resolveType(ElementInput.class.getTypeParameters()[0])
-                    .getRawType();
-        } else if (plottable.getClass().isAnnotationPresent(HasUnit.class))
-            quantityCls = plottable.getClass();
+    public <T> Plot add(String name, Unit unit, SimulationValue<Double> value) {
+        return add(name, unit, value::get);
+    }
 
-        Unit unit = null;
-        if (quantityCls != null) {
-            var hasUnit = quantityCls.getAnnotation(HasUnit.class);
-            unit = hasUnit == null ? null : hasUnit.value();
-        }
-        if (unit == null) {
-            throw new RuntimeException("No quantity found for " + plottable + " quantityCls " + quantityCls);
-        }
-        this.series.add(new Series(name, unit, () -> plottable.plotValue()));
+    public <T> Plot add(String name, Unit unit, Supplier<Double> valueSupplier) {
+        this.series.add(new Series(name, unit, valueSupplier));
         if (unit == Unit.Digital)
             stepAfter();
         return this;
     }
 
-    public Plot start(double seconds) {
-        this.start = Instant.of(seconds);
+    public Plot start(Double seconds) {
+        this.start = seconds;
         return this;
     }
 
-    public Plot end(double seconds) {
-        this.end = Instant.of(seconds);
+    public Plot end(Double seconds) {
+        this.end = seconds;
         return this;
     }
 
@@ -139,10 +121,10 @@ public class Plot {
             if (end == null) {
                 end = values.get(values.size() - 1).time;
             }
-            timePrefix = SiPrefixRest.toPMod(SiPrefix.get(end.value()));
+            timePrefix = SiPrefixRest.toPMod(SiPrefix.get(end));
         } else {
-            start = Instant.of(0);
-            end = Instant.of(1);
+            start = 0.;
+            end = 1.;
             timePrefix = SiPrefixRest.toPMod(SiPrefix.ONE);
         }
         this.plotGroup.plots.add(this);

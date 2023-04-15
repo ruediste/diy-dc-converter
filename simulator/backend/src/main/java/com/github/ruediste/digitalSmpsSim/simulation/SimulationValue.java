@@ -18,6 +18,11 @@ public class SimulationValue<T> {
         this.nextValue = nextValue;
     }
 
+    public void initialize(T value) {
+        this.value = value;
+        this.nextValue = value;
+    }
+
     void transferNextValue() {
         this.value = nextValue;
     }

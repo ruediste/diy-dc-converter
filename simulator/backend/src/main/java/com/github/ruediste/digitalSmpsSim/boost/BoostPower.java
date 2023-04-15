@@ -35,6 +35,7 @@ public class BoostPower extends CircuitElement {
     public void run(double stepStart, double stepEnd, double stepDuration) {
         double vL = inductorVoltage();
 
+        // change of the inductor voltage
         // V=L*di/dt; di=V*dt/L
         var dIL = vL * stepDuration / inductance;
 
@@ -58,12 +59,15 @@ public class BoostPower extends CircuitElement {
         vOut += iC * stepDuration / capacitance;
 
         circuit.outputVoltage.set(vOut);
+        circuit.inductorCurrent.set(iL);
     }
 
     @Override
     public Double stepEndTime(double stepStart) {
         double vL = inductorVoltage();
-        if (vL < -1e-8) {
+        // check if current is flowing forward against a negative voltage, thus it will
+        // reach zero eventually
+        if (vL < -1e-8 && iL > 1e-8) {
             // determine when the current reaches zero, to correctly handle DCM
             // V=L*di/dt; dt=L*di/V
             return stepStart - inductance * iL / vL;

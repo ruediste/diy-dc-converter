@@ -10,11 +10,9 @@ import org.springframework.stereotype.Component;
 
 import com.github.ruediste.digitalSmpsSim.PlotRest.PlotGroup;
 import com.github.ruediste.digitalSmpsSim.boost.BoostCircuit;
-import com.github.ruediste.digitalSmpsSim.boost.BoostDesign;
+import com.github.ruediste.digitalSmpsSim.boost.BoostControlPID;
 import com.github.ruediste.digitalSmpsSim.optimization.Optimizer;
-import com.github.ruediste.digitalSmpsSim.quantity.Current;
-import com.github.ruediste.digitalSmpsSim.quantity.Instant;
-import com.github.ruediste.digitalSmpsSim.quantity.Voltage;
+import com.github.ruediste.digitalSmpsSim.quantity.Unit;
 import com.github.ruediste.digitalSmpsSim.simulation.Plot;
 import com.github.ruediste.digitalSmpsSim.simulation.Simulator;
 
@@ -28,7 +26,6 @@ public class Simulations {
     List<PlotGroup> plotGroups = new ArrayList<>();
 
     private enum Event {
-        STEADY,
         INPUT_DROP,
         LOAD_DROP,
         SETPOINT_CHANGE,
@@ -43,10 +40,8 @@ public class Simulations {
     @PostConstruct
     public void run() {
         var sim = new Simulator();
-        var optimizer = new Optimizer();
 
         var circuitSet = createCircuits();
-        var simulationPeriods = 1000;
         switch (Variant.OPTIMIZE_ALL) {
             case MANUAL: {
                 var first = true;
@@ -54,11 +49,10 @@ public class Simulations {
                     try {
                         var circuit = circuitSupplier.get();
                         if (first) {
-                            log.info("kP: {} kI: {} kD: {} lowPass: {}", circuit.control.kP, circuit.control.kI,
-                                    circuit.control.kD, circuit.control.lowPass);
+                            log.info(circuit.control.parameterInfo());
                             first = false;
                         }
-                        sim.simulate(circuit, circuit.switchingPeriod() * simulationPeriods, circuit.plots);
+                        sim.simulate(circuit, circuit.control.simulationDuration(), circuit.plots);
                     } catch (Exception e) {
                         log.error("Error in simulation", e);
                     }
@@ -69,29 +63,25 @@ public class Simulations {
                 for (var circuitSupplier : circuitSet.circuits) {
                     try {
                         var circuit = circuitSupplier.get();
-                        var optimization = optimizer.optimize(circuit, List.of(circuitSupplier), simulationPeriods);
+                        var optimization = circuit.control.optimize(List.of(circuitSupplier));
                         optimization.accept(circuit);
-                        log.info("kP: {} kI: {} kD: {} lowPass: {}", circuit.control.kP, circuit.control.kI,
-                                circuit.control.kD, circuit.control.lowPass);
-                        sim.simulate(circuit, circuit.switchingPeriod() * simulationPeriods, circuit.plots);
+                        sim.simulate(circuit, circuit.control.simulationDuration(), circuit.plots);
                     } catch (Exception e) {
                         log.error("Error in simulation", e);
                     }
                 }
                 break;
             case OPTIMIZE_ALL: {
-                var optimization = optimizer.optimize(circuitSet.circuits.get(0).get(), circuitSet.circuits,
-                        simulationPeriods);
+                var optimization = circuitSet.circuits.get(0).get().control.optimize(circuitSet.circuits);
                 boolean first = true;
                 for (var circuitSupplier : circuitSet.circuits) {
                     var circuit = circuitSupplier.get();
                     optimization.accept(circuit);
                     if (first) {
                         first = false;
-                        log.info("kP: {} kI: {} kD: {} lowPass: {}", circuit.control.kP, circuit.control.kI,
-                                circuit.control.kD, circuit.control.lowPass);
+                        log.info(circuit.control.parameterInfo());
                     }
-                    sim.simulate(circuit, circuit.switchingPeriod() * simulationPeriods, circuit.plots);
+                    sim.simulate(circuit, circuit.control.simulationDuration(), circuit.plots);
                 }
             }
                 break;
@@ -121,77 +111,77 @@ public class Simulations {
 
     public CircuitSet createCircuits() {
         CircuitSet result = new CircuitSet();
-        var design = new BoostDesign();
-        design.outputRipple = Voltage.of(0.1);
+        // var design = new BoostDesign();
+        // design.outputRipple = Voltage.of(0.1);
 
-        List<Voltage> vOuts = List.of(7., 10., 20., 30.).stream().map(v -> Voltage.of(v)).toList();
-        List<Current> iOuts = List.of(0.01, 0.1, 1., 2.).stream().map(v -> Current.of(v)).toList();
+        double vIn = 5;
+        List<Double> vOuts = List.of(7., 10., 20., 30.);
+        List<Double> iOuts = List.of(0.01, 0.1, 1., 2.);
 
         for (var event : Event.values()) {
             var plotGroup = result.plotGroup(event.toString());
             for (var vOut : vOuts)
                 for (var iOut : iOuts) {
-                    if (event == Event.STEADY)
-                        continue;
                     // if (iOut.value() >= 1.)
                     // continue;
                     // if (event != Event.INPUT_DROP || vOut.value() != 10 || iOut.value() != 1)
                     // continue;
                     result.circuits.add(() -> {
-                        var circuit = design.circuit();
-                        circuit.load.resistance.set(Instant.of(0), vOut.divide(iOut));
-                        circuit.power.vCap = vOut;
-                        circuit.control.targetVoltage.set(Instant.of(0), vOut);
+                        // var circuit = design.circuit();
+                        var circuit = new BoostCircuit();
+                        var control = new BoostControlPID(circuit);
+                        circuit.control = control;
 
-                        var iLAvg = Current.of(iOut.value() * vOut.value() / design.inputVoltage.value());
-                        // Vo= Vin/(1-D); 1-D=Vin/Vo; D-1=-Vin/Vo; D=1-Vin/Vo;
+                        circuit.source.voltage.set(0, vIn);
+                        circuit.load.resistance.set(0, vOut / iOut);
+                        circuit.outputVoltage.set(vOut);
+                        control.targetVoltage.set(0, vOut);
 
-                        var ccmDuty = 1 - design.inputVoltage.value() / vOut.value();
-                        var iLRipple = design.inputVoltage.value() * ccmDuty * design.switchingPeriod().value()
-                                / circuit.power.inductance;
+                        control.initializeSteadyState();
 
-                        if (iLAvg.value() > iLRipple / 2) {
-                            // CCM Mode
-                            circuit.power.iL = iLAvg.minus(iLRipple / 2);
-                            circuit.control.duty = ccmDuty;
-                        } else {
-                            // DCM Mode
-                            circuit.power.iL = Current.of(0);
+                        // var iLAvg = Current.of(iOut.value() * vOut.value() /
+                        // design.inputVoltage.value());
+                        // // Vo= Vin/(1-D); 1-D=Vin/Vo; D-1=-Vin/Vo; D=1-Vin/Vo;
 
-                            // time required to get to twice the average input current
-                            var tOn = circuit.power.inductance * iLAvg.value() * 2 / design.inputVoltage.value();
+                        // var ccmDuty = 1 - design.inputVoltage.value() / vOut.value();
+                        // var iLRipple = design.inputVoltage.value() * ccmDuty *
+                        // design.switchingPeriod().value()
+                        // / circuit.power.inductance;
 
-                            circuit.control.duty = tOn / design.switchingPeriod().value();
-                        }
+                        // if (iLAvg.value() > iLRipple / 2) {
+                        // // CCM Mode
+                        // circuit.power.iL = iLAvg.minus(iLRipple / 2);
+                        // circuit.control.duty = ccmDuty;
+                        // } else {
+                        // // DCM Mode
+                        // circuit.power.iL = Current.of(0);
+
+                        // // time required to get to twice the average input current
+                        // var tOn = circuit.power.inductance * iLAvg.value() * 2 /
+                        // design.inputVoltage.value();
+
+                        // circuit.control.duty = tOn / design.switchingPeriod().value();
+                        // }
+
+                        double eventTime = circuit.control.eventTime();
 
                         var plot = result.plot(plotGroup, vOut + " - " + iOut)
-                                .add("Vout", circuit.power.vOut)
-                                .add("IL", circuit.power.ilOut)
-                                .add("d", circuit.control.dutyOut)
+                                .add("Vout", Unit.Volt, circuit.outputVoltage)
+                                .add("IL", Unit.Ampere, circuit.inductorCurrent)
+                                .add("d", Unit.Number, circuit.duty)
                                 // .add("di", circuit.control.di)
                                 // .add("Error", circuit.control.errorOut)
-                                .add("Cost", circuit.costCalculator.currentCost);
+                                .add("Cost", Unit.Number, () -> circuit.costCalculator.currentCost);
                         switch (event) {
-                            case INPUT_DROP: {
-                                var dropTime = Instant.of(design.switchingPeriod().value() * 100);
-                                circuit.source.voltage.set(dropTime,
-                                        design.inputVoltage.minus(1));
-                            }
+                            case INPUT_DROP:
+                                circuit.source.voltage.set(eventTime, vIn - 1);
                                 break;
-                            case STEADY:
-                                // NOP
+                            case LOAD_DROP:
+                                circuit.load.resistance.set(eventTime,
+                                        circuit.load.resistance.get(0) * 1.5);
                                 break;
-                            case LOAD_DROP: {
-                                var dropTime = Instant.of(design.switchingPeriod().value() * 100);
-                                circuit.load.resistance.set(dropTime,
-                                        circuit.load.resistance.get(Instant.of(0)).scale(1.5));
-                            }
-                                break;
-                            case SETPOINT_CHANGE: {
-                                var dropTime = Instant.of(design.switchingPeriod().value() * 100);
-                                circuit.control.targetVoltage.set(dropTime,
-                                        vOut.scale(0.8));
-                            }
+                            case SETPOINT_CHANGE:
+                                control.targetVoltage.set(eventTime, vOut * 0.8);
                                 break;
                             default:
                                 break;
