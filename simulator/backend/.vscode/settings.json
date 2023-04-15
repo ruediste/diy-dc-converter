@@ -6,6 +6,7 @@
         "rawtypes",
         "ruediste",
         "SETPOINT",
-        "Smps"
+        "Smps",
+        "Vout"
     ]
 }

@@ -11,20 +11,11 @@ public class HardwareTimer extends CircuitElement {
         super(circuit);
     }
 
-    protected HardwareTimer(CircuitElement element) {
-        this(element, null);
-    }
-
-    protected HardwareTimer(CircuitElement element, TimerCallback onOverflow) {
-        super(element.circuit);
-        this.onReload = onOverflow;
-    }
-
     public interface TimerCallback {
         public void run(double instant);
     }
 
-    public double clockFrequency;
+    public double clockFrequency = 84e6;
 
     public long prescale;
     public long reload;
@@ -45,7 +36,7 @@ public class HardwareTimer extends CircuitElement {
     private double nextCycleStart;
 
     private void updateInstants() {
-        var clockPeriod = prescale * 1 / clockFrequency;
+        var clockPeriod = (prescale + 1) * 1 / clockFrequency;
         nextCycleStart = lastCycleStart + clockPeriod * reload;
         for (var channel : channels) {
             channel.nextCompareMatchInstant = lastCycleStart + clockPeriod * channel.compare;
@@ -54,7 +45,7 @@ public class HardwareTimer extends CircuitElement {
     }
 
     @Override
-    public void initialize() {
+    public void postInitialize() {
         updateInstants();
     }
 
@@ -81,7 +72,7 @@ public class HardwareTimer extends CircuitElement {
                 channel.matched = true;
             }
         }
-        if (stepEnd <= nextCycleStart) {
+        if (stepEnd >= nextCycleStart) {
             if (onReload != null)
                 onReload.run(stepEnd);
             lastCycleStart = nextCycleStart;

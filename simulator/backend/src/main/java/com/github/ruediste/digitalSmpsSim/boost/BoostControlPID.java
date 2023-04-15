@@ -35,11 +35,9 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
 
     @Override
     public void initialize() {
-        super.initialize();
-
         var calc = new PwmValuesCalculator();
         {
-            var values = calc.calculate(switchingFrequency, 0.1);
+            var values = calc.calculate(switchingFrequency, duty);
             pwmTimer.prescale = values.prescale;
             pwmTimer.reload = values.reload;
             pwmChannel.compare = values.compare;
@@ -78,9 +76,10 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
 
         duty = Math.max(0.01, Math.min(duty, 0.99));
 
-        pwmChannel.compare = (long) duty * pwmTimer.reload;
+        pwmChannel.compare = (long) (duty * pwmTimer.reload);
 
         lastOutputVoltage = circuit.outputVoltage.get();
+        circuit.duty.set(duty);
     }
 
     public <T extends PowerCircuitBase> Consumer<T> optimize(List<Supplier<T>> circuitSuppliers) {
@@ -131,6 +130,8 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
         calc.switchingFrequency = switchingFrequency;
         var result = calc.calculate();
         duty = result.duty;
+        circuit.duty.initialize(duty);
         integral = -duty / kI;
+        circuit.power.iL = result.initialInductorCurrent;
     }
 }

@@ -5,11 +5,7 @@ import java.util.List;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.github.ruediste.digitalSmpsSim.PlotRest.PlotGroup;
 import com.github.ruediste.digitalSmpsSim.quantity.SiPrefix;
-import com.github.ruediste.digitalSmpsSim.quantity.SiPrefixRest;
-import com.github.ruediste.digitalSmpsSim.quantity.SiPrefixRest.SiPrefixPMod;
 import com.github.ruediste.digitalSmpsSim.quantity.Unit;
 
 public class Plot {
@@ -18,14 +14,13 @@ public class Plot {
     public Double end;
     public String title;
 
-    public SiPrefixPMod timePrefix;
+    public SiPrefix timePrefix;
 
     public List<Series> series = new ArrayList<>();
 
     public List<PlotValues> values = new ArrayList<>();
 
     public List<PlotYAxis> axes = new ArrayList<>();
-    private PlotGroup plotGroup;
 
     public static class PlotYAxis {
         public int index;
@@ -38,7 +33,6 @@ public class Plot {
         public String name;
         public Unit unit;
         public String unitSymbol;
-        @JsonIgnore
         public Supplier<Double> valueSupplier;
         public boolean stepAfter;
         public int yAxisIndex;
@@ -56,10 +50,6 @@ public class Plot {
     public static class PlotValues {
         public double time;
         public List<Double> values = new ArrayList<>();
-    }
-
-    public Plot(PlotGroup plotGroup) {
-        this.plotGroup = plotGroup;
     }
 
     public <T> Plot add(String name, Unit unit, SimulationValue<Double> value) {
@@ -121,13 +111,12 @@ public class Plot {
             if (end == null) {
                 end = values.get(values.size() - 1).time;
             }
-            timePrefix = SiPrefixRest.toPMod(SiPrefix.get(end));
+            timePrefix = SiPrefix.get(end);
         } else {
             start = 0.;
             end = 1.;
-            timePrefix = SiPrefixRest.toPMod(SiPrefix.ONE);
+            timePrefix = SiPrefix.ONE;
         }
-        this.plotGroup.plots.add(this);
     }
 
 }

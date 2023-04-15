@@ -6,24 +6,18 @@ import java.util.function.Supplier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
-import com.github.ruediste.digitalSmpsSim.PlotRest.PlotGroup;
 import com.github.ruediste.digitalSmpsSim.boost.BoostCircuit;
 import com.github.ruediste.digitalSmpsSim.boost.BoostControlPID;
-import com.github.ruediste.digitalSmpsSim.optimization.Optimizer;
 import com.github.ruediste.digitalSmpsSim.quantity.Unit;
 import com.github.ruediste.digitalSmpsSim.simulation.Plot;
 import com.github.ruediste.digitalSmpsSim.simulation.Simulator;
 
-import jakarta.annotation.PostConstruct;
-
-@Component
 public class Simulations {
 
     Logger log = LoggerFactory.getLogger(Simulations.class);
 
-    List<PlotGroup> plotGroups = new ArrayList<>();
+    List<Plot> plots = new ArrayList<>();
 
     private enum Event {
         INPUT_DROP,
@@ -37,12 +31,11 @@ public class Simulations {
         OPTIMIZE_ALL,
     }
 
-    @PostConstruct
     public void run() {
         var sim = new Simulator();
 
         var circuitSet = createCircuits();
-        switch (Variant.OPTIMIZE_ALL) {
+        switch (Variant.MANUAL) {
             case MANUAL: {
                 var first = true;
                 for (var circuitSupplier : circuitSet.circuits) {
@@ -89,22 +82,17 @@ public class Simulations {
                 break;
 
         }
-        this.plotGroups = circuitSet.plotGroups;
+        this.plots = circuitSet.plots;
     }
 
     public static class CircuitSet {
-        List<PlotGroup> plotGroups = new ArrayList<>();
+        List<Plot> plots = new ArrayList<>();
         List<Supplier<BoostCircuit>> circuits = new ArrayList<>();
 
-        public PlotGroup plotGroup(String label) {
-            var group = new PlotGroup(label);
-            this.plotGroups.add(group);
-            return group;
-        }
-
-        public Plot plot(PlotGroup group, String title) {
-            var plot = new Plot(group);
+        public Plot plot(String title) {
+            var plot = new Plot();
             plot.title = title;
+            this.plots.add(plot);
             return plot;
         }
     }
@@ -115,17 +103,20 @@ public class Simulations {
         // design.outputRipple = Voltage.of(0.1);
 
         double vIn = 5;
-        List<Double> vOuts = List.of(7., 10., 20., 30.);
-        List<Double> iOuts = List.of(0.01, 0.1, 1., 2.);
+        List<Double> vOuts = List.of(12.);
+        List<Double> iOuts = List.of(0.1);
+        // List<Double> vOuts = List.of(7., 10., 20., 30.);
+        // List<Double> iOuts = List.of(0.01, 0.1, 1., 2.);
 
         for (var event : Event.values()) {
-            var plotGroup = result.plotGroup(event.toString());
             for (var vOut : vOuts)
                 for (var iOut : iOuts) {
                     // if (iOut.value() >= 1.)
                     // continue;
                     // if (event != Event.INPUT_DROP || vOut.value() != 10 || iOut.value() != 1)
                     // continue;
+                    if (event != Event.LOAD_DROP)
+                        continue;
                     result.circuits.add(() -> {
                         // var circuit = design.circuit();
                         var circuit = new BoostCircuit();
@@ -139,39 +130,17 @@ public class Simulations {
 
                         control.initializeSteadyState();
 
-                        // var iLAvg = Current.of(iOut.value() * vOut.value() /
-                        // design.inputVoltage.value());
-                        // // Vo= Vin/(1-D); 1-D=Vin/Vo; D-1=-Vin/Vo; D=1-Vin/Vo;
-
-                        // var ccmDuty = 1 - design.inputVoltage.value() / vOut.value();
-                        // var iLRipple = design.inputVoltage.value() * ccmDuty *
-                        // design.switchingPeriod().value()
-                        // / circuit.power.inductance;
-
-                        // if (iLAvg.value() > iLRipple / 2) {
-                        // // CCM Mode
-                        // circuit.power.iL = iLAvg.minus(iLRipple / 2);
-                        // circuit.control.duty = ccmDuty;
-                        // } else {
-                        // // DCM Mode
-                        // circuit.power.iL = Current.of(0);
-
-                        // // time required to get to twice the average input current
-                        // var tOn = circuit.power.inductance * iLAvg.value() * 2 /
-                        // design.inputVoltage.value();
-
-                        // circuit.control.duty = tOn / design.switchingPeriod().value();
-                        // }
-
                         double eventTime = circuit.control.eventTime();
 
-                        var plot = result.plot(plotGroup, vOut + " - " + iOut)
+                        var plot = result.plot(vOut + " - " + iOut)
                                 .add("Vout", Unit.Volt, circuit.outputVoltage)
                                 .add("IL", Unit.Ampere, circuit.inductorCurrent)
-                                .add("d", Unit.Number, circuit.duty)
-                                // .add("di", circuit.control.di)
-                                // .add("Error", circuit.control.errorOut)
-                                .add("Cost", Unit.Number, () -> circuit.costCalculator.currentCost);
+                        // .add("d", Unit.Number, circuit.duty)
+                        // .add("sw", Unit.Number, () -> (Double) (circuit.switchOn.get() ? 1. : 0.))
+                        // .add("di", circuit.control.di)
+                        // .add("Error", circuit.control.errorOut)
+                        // .add("Cost", Unit.Number, () -> circuit.costCalculator.currentCost)
+                        ;
                         switch (event) {
                             case INPUT_DROP:
                                 circuit.source.voltage.set(eventTime, vIn - 1);

@@ -12,21 +12,28 @@ public abstract class ControlBase<TCircuit extends PowerCircuitBase> extends Cir
 
     public double duty = 0.5;
 
-    public HardwareTimer pwmTimer = new HardwareTimer(this);
-    public HardwareTimer.Channel pwmChannel = pwmTimer.createChannel(null);
-    public HardwareTimer.Channel adcChannel = pwmTimer.createChannel(null);
-    public HardwareTimer controlTimer = new HardwareTimer(this);
+    public final HardwareTimer pwmTimer;
+    public final HardwareTimer.Channel pwmChannel;
+    public final HardwareTimer.Channel adcChannel;
+    public final HardwareTimer controlTimer;
 
     double measuredOutputVoltage;
 
     protected ControlBase(TCircuit circuit) {
         super(circuit);
         this.circuit = circuit;
-        pwmTimer.onReload = (instant) -> circuit.switchOn.set(true);
-        pwmChannel.onCompare = (instant) -> circuit.switchOn.set(false);
-        adcChannel.onCompare = (instant) -> circuit
+        pwmTimer = new HardwareTimer(circuit);
+        controlTimer = new HardwareTimer(circuit);
+        pwmChannel = pwmTimer.createChannel((instant) -> {
+            circuit.switchOn.set(false);
+        });
+        adcChannel = pwmTimer.createChannel((instant) -> circuit
                 .withUpdatedValues(
-                        () -> measuredOutputVoltage = circuit.outputVoltage.get());
+                        () -> measuredOutputVoltage = circuit.outputVoltage.get()));
+        pwmTimer.onReload = (instant) -> {
+            circuit.switchOn.set(true);
+        };
+        circuit.switchOn.initialize(true);
     }
 
     public abstract double targetValue(double instant);

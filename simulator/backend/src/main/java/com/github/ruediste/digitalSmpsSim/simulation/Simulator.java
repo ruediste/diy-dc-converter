@@ -37,6 +37,7 @@ public class Simulator {
     public void simulate(Circuit circuit, double finalTime, List<Plot> plots) {
         circuit.initialize();
         circuit.elements.forEach(e -> e.initialize());
+        circuit.elements.forEach(e -> e.postInitialize());
         circuit.propagateSignals();
         double time = 0;
         fillPlots(time, plots, true);
@@ -66,9 +67,11 @@ public class Simulator {
                 stepEnd = 1e-10;
 
             for (var element : circuit.elements)
-                element.run(time, stepEnd, time - stepEnd);
+                element.run(time, stepEnd, stepEnd - time);
 
             circuit.propagateSignals();
+            circuit.withUpdatedValues.forEach(x -> x.run());
+            circuit.withUpdatedValues.clear();
             time = stepEnd;
             {
                 boolean addPoint = time > nextPlot;
