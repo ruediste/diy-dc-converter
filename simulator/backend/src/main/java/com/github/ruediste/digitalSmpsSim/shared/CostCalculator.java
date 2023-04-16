@@ -19,8 +19,8 @@ public class CostCalculator extends CircuitElement {
     public double currentCost;
 
     double kError = 1;
-    double kDiff = 1;
-    double kDiffDuty = 1000;
+    double kDiff = 0;
+    double kDiffDuty = 0; // 1000;
     double kCurrent = 0;
 
     double alpha = 0.1;
@@ -43,7 +43,7 @@ public class CostCalculator extends CircuitElement {
             var cost = 0.;
 
             // error squared
-            {
+            if (false) {
                 var tmp = value / circuit.control.targetValue(stepStart);
                 if (tmp < 1) {
                     tmp = Math.max(0.1, 1 / tmp);
@@ -51,6 +51,7 @@ public class CostCalculator extends CircuitElement {
                 cost += kError * (Math.pow(tmp, 2)
                         - 1);
             }
+            cost += kError * Math.pow(value - circuit.control.targetValue(stepStart), 2);
 
             // differentiation
             cost += kDiff * Math.pow(value - avgOutputVoltage, 2);
@@ -66,11 +67,7 @@ public class CostCalculator extends CircuitElement {
             // duty diff
             cost += kDiffDuty * Math.pow(circuit.control.duty - avgDuty, 2);
 
-            if (stepStart < 1e-3) {
-                cost = 0;
-            }
-
-            totalCost += cost;
+            totalCost += cost * stepDuration;
             currentCost = cost;
 
             nextEvaluation += evaluationPeriod;

@@ -1,5 +1,6 @@
 package com.github.ruediste.digitalSmpsSim;
 
+import javax.swing.BoxLayout;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -12,6 +13,7 @@ import java.awt.FlowLayout;
 import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Rectangle;
+import java.util.stream.Collectors;
 
 import org.knowm.xchart.XChartPanel;
 import org.knowm.xchart.XYChart;
@@ -26,38 +28,50 @@ public class DigitalSmpsSimApplication {
 		var simulations = new Simulations();
 		simulations.run();
 
-		var charts = simulations.plots.stream().map(plot -> {
+		var circuits = simulations.circuits.stream().map(circuit -> {
 
-			// Create Chart
-			final XYChart chart = new XYChartBuilder().width(1200).height(400).title(plot.title)
-					.xAxisTitle("Time [" + plot.timePrefix.symbol + "s]")
-					.build();
-			// Customize Chart
-			chart.getStyler().setLegendPosition(LegendPosition.InsideNE);
-			// chart.getStyler().setDefaultSeriesRenderStyle(XYSeriesRenderStyle.Area);
+			var circuitPanel = new JPanel();
+			circuitPanel.setLayout(new BoxLayout(circuitPanel, BoxLayout.PAGE_AXIS));
 
-			for (var axis : plot.axes) {
-				chart.setYAxisGroupTitle(axis.index, axis.unitSymbol);
-			}
+			circuitPanel.add(new JLabel(circuit.parameterValues.stream().map(x -> x.axis() + ":" + x.label())
+					.collect(Collectors.joining(" ")) + " totalCost: %.3e".formatted(circuit.costCalculator.totalCost)
+					+ " "
+					+ circuit.control.parameterInfo()));
 
-			for (int i = 0; i < plot.series.size(); i++) {
-				var s = plot.series.get(i);
-				double[] xData = new double[plot.values.size()];
-				double[] yData = new double[plot.values.size()];
-				for (int p = 0; p < plot.values.size(); p++) {
-					var values = plot.values.get(p);
-					xData[p] = values.time;
-					yData[p] = values.values.get(i);
-					if (Double.isInfinite(yData[p])) {
-						yData[p] = 0;
-					}
+			for (var plot : circuit.plots) {
+				// Create Chart
+				final XYChart chart = new XYChartBuilder().width(1200).height(400).title(plot.title)
+						.xAxisTitle("Time [" + plot.timePrefix.symbol + "s]")
+						.build();
+				// Customize Chart
+				chart.getStyler().setLegendPosition(LegendPosition.InsideNE);
+				chart.setCustomXAxisTickLabelsFormatter(t -> plot.timePrefix.toString(t, "s"));
+				// chart.getStyler().setDefaultSeriesRenderStyle(XYSeriesRenderStyle.Area);
+
+				for (var axis : plot.axes) {
+					chart.setYAxisGroupTitle(axis.index, axis.unitSymbol);
 				}
-				var series = new XYSeries(s.name, xData, yData, null, DataType.Number);
-				series.setYAxisGroup(s.yAxisIndex);
-				chart.getSeriesMap().put(s.name, series);
-			}
 
-			return chart;
+				for (int i = 0; i < plot.series.size(); i++) {
+					var s = plot.series.get(i);
+					double[] xData = new double[plot.values.size()];
+					double[] yData = new double[plot.values.size()];
+					for (int p = 0; p < plot.values.size(); p++) {
+						var values = plot.values.get(p);
+						xData[p] = values.time;
+						yData[p] = values.values.get(i);
+						if (Double.isInfinite(yData[p])) {
+							yData[p] = 0;
+						}
+					}
+					var series = new XYSeries(s.name, xData, yData, null, DataType.Number);
+					series.setYAxisGroup(s.yAxisIndex);
+					chart.getSeriesMap().put(s.name, series);
+				}
+
+				circuitPanel.add(new XChartPanel<XYChart>(chart));
+			}
+			return circuitPanel;
 		}).toList();
 
 		// Schedule a job for the event-dispatching thread:
@@ -83,10 +97,7 @@ public class DigitalSmpsSimApplication {
 
 				frame.add(scrollPane, BorderLayout.CENTER);
 
-				for (var chart : charts) {
-					JPanel chartPanel = new XChartPanel<XYChart>(chart);
-					plotsPanel.add(chartPanel);
-				}
+				circuits.forEach(plotsPanel::add);
 
 				// label
 				JLabel label = new JLabel("Blah blah blah.", SwingConstants.CENTER);

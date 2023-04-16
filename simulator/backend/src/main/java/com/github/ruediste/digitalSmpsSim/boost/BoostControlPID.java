@@ -17,12 +17,12 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
 
     public StepChangingValue<Double> targetVoltage = new StepChangingValue<>();
 
-    public double kP = 0.136;
+    public double kP = 0.0136;
     public double kI = 0.0049;
-    public double kD = 3.5;
+    public double kD = 0.35;
 
     public double switchingFrequency = 100e3;
-    public double controlFrequency = 10e3;
+    public double controlFrequency = 50e3;
 
     public double lowPass = 4;
 
@@ -112,7 +112,7 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
 
     @Override
     public double simulationDuration() {
-        return 200 / controlFrequency;
+        return 50 / controlFrequency;
     }
 
     @Override

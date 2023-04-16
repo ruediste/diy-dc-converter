@@ -9,7 +9,9 @@ import org.slf4j.LoggerFactory;
 
 import com.github.ruediste.digitalSmpsSim.boost.BoostCircuit;
 import com.github.ruediste.digitalSmpsSim.boost.BoostControlPID;
+import com.github.ruediste.digitalSmpsSim.quantity.SiPrefix;
 import com.github.ruediste.digitalSmpsSim.quantity.Unit;
+import com.github.ruediste.digitalSmpsSim.shared.PowerCircuitBase;
 import com.github.ruediste.digitalSmpsSim.simulation.Plot;
 import com.github.ruediste.digitalSmpsSim.simulation.Simulator;
 
@@ -17,7 +19,18 @@ public class Simulations {
 
     Logger log = LoggerFactory.getLogger(Simulations.class);
 
-    List<Plot> plots = new ArrayList<>();
+    List<PowerCircuitBase> circuits = new ArrayList<>();
+
+    public enum CircuitParameterAxis {
+        EVENT,
+        V_OUT,
+        I_OUT
+    }
+
+    public record CircuitParameterValue(
+            CircuitParameterAxis axis,
+            String label) {
+    };
 
     private enum Event {
         INPUT_DROP,
@@ -34,11 +47,11 @@ public class Simulations {
     public void run() {
         var sim = new Simulator();
 
-        var circuitSet = createCircuits();
-        switch (Variant.MANUAL) {
+        var circuitSuppliers = createCircuits();
+        switch (Variant.OPTIMIZE_INDIVIDUAL) {
             case MANUAL: {
                 var first = true;
-                for (var circuitSupplier : circuitSet.circuits) {
+                for (var circuitSupplier : circuitSuppliers) {
                     try {
                         var circuit = circuitSupplier.get();
                         if (first) {
@@ -46,6 +59,7 @@ public class Simulations {
                             first = false;
                         }
                         sim.simulate(circuit, circuit.control.simulationDuration(), circuit.plots);
+                        this.circuits.add(circuit);
                     } catch (Exception e) {
                         log.error("Error in simulation", e);
                     }
@@ -53,21 +67,22 @@ public class Simulations {
             }
                 break;
             case OPTIMIZE_INDIVIDUAL:
-                for (var circuitSupplier : circuitSet.circuits) {
+                for (var circuitSupplier : circuitSuppliers) {
                     try {
                         var circuit = circuitSupplier.get();
                         var optimization = circuit.control.optimize(List.of(circuitSupplier));
                         optimization.accept(circuit);
                         sim.simulate(circuit, circuit.control.simulationDuration(), circuit.plots);
+                        this.circuits.add(circuit);
                     } catch (Exception e) {
                         log.error("Error in simulation", e);
                     }
                 }
                 break;
             case OPTIMIZE_ALL: {
-                var optimization = circuitSet.circuits.get(0).get().control.optimize(circuitSet.circuits);
+                var optimization = circuitSuppliers.get(0).get().control.optimize(circuitSuppliers);
                 boolean first = true;
-                for (var circuitSupplier : circuitSet.circuits) {
+                for (var circuitSupplier : circuitSuppliers) {
                     var circuit = circuitSupplier.get();
                     optimization.accept(circuit);
                     if (first) {
@@ -75,6 +90,7 @@ public class Simulations {
                         log.info(circuit.control.parameterInfo());
                     }
                     sim.simulate(circuit, circuit.control.simulationDuration(), circuit.plots);
+                    this.circuits.add(circuit);
                 }
             }
                 break;
@@ -82,23 +98,10 @@ public class Simulations {
                 break;
 
         }
-        this.plots = circuitSet.plots;
     }
 
-    public static class CircuitSet {
-        List<Plot> plots = new ArrayList<>();
-        List<Supplier<BoostCircuit>> circuits = new ArrayList<>();
-
-        public Plot plot(String title) {
-            var plot = new Plot();
-            plot.title = title;
-            this.plots.add(plot);
-            return plot;
-        }
-    }
-
-    public CircuitSet createCircuits() {
-        CircuitSet result = new CircuitSet();
+    public List<Supplier<BoostCircuit>> createCircuits() {
+        List<Supplier<BoostCircuit>> result = new ArrayList<>();
         // var design = new BoostDesign();
         // design.outputRipple = Voltage.of(0.1);
 
@@ -117,11 +120,15 @@ public class Simulations {
                     // continue;
                     if (event != Event.LOAD_DROP)
                         continue;
-                    result.circuits.add(() -> {
+                    result.add(() -> {
                         // var circuit = design.circuit();
                         var circuit = new BoostCircuit();
                         var control = new BoostControlPID(circuit);
                         circuit.control = control;
+
+                        circuit.addParameterValue(CircuitParameterAxis.EVENT, event.toString());
+                        circuit.addParameterValue(CircuitParameterAxis.V_OUT, SiPrefix.format(vOut, "V"));
+                        circuit.addParameterValue(CircuitParameterAxis.I_OUT, SiPrefix.format(iOut, "A"));
 
                         circuit.source.voltage.set(0, vIn);
                         circuit.load.resistance.set(0, vOut / iOut);
@@ -132,14 +139,15 @@ public class Simulations {
 
                         double eventTime = circuit.control.eventTime();
 
-                        var plot = result.plot(vOut + " - " + iOut)
+                        new Plot(circuit, vOut + " - " + iOut)
                                 .add("Vout", Unit.Volt, circuit.outputVoltage)
                                 .add("IL", Unit.Ampere, circuit.inductorCurrent)
-                        // .add("d", Unit.Number, circuit.duty)
-                        // .add("sw", Unit.Number, () -> (Double) (circuit.switchOn.get() ? 1. : 0.))
-                        // .add("di", circuit.control.di)
-                        // .add("Error", circuit.control.errorOut)
-                        // .add("Cost", Unit.Number, () -> circuit.costCalculator.currentCost)
+                                // .add("d", Unit.Number, circuit.duty)
+                                // .add("sw", Unit.Number, () -> (Double) (circuit.switchOn.get() ? 1. : 0.))
+                                // .add("di", circuit.control.di)
+                                // .add("Error", circuit.control.errorOut)
+                                .add("Cost", Unit.Number, () -> circuit.costCalculator.currentCost)
+                        //
                         ;
                         switch (event) {
                             case INPUT_DROP:
@@ -156,7 +164,6 @@ public class Simulations {
                                 break;
 
                         }
-                        circuit.plots.add(plot);
                         return circuit;
                     });
 

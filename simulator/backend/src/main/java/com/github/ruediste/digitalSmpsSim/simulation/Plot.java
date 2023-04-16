@@ -52,6 +52,11 @@ public class Plot {
         public List<Double> values = new ArrayList<>();
     }
 
+    public Plot(Circuit circuit, String title) {
+        circuit.plots.add(this);
+        this.title = title;
+    }
+
     public <T> Plot add(String name, Unit unit, SimulationValue<Double> value) {
         return add(name, unit, value::get);
     }

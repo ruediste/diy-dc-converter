@@ -54,7 +54,7 @@ Now remove the wire from the load resistor:
 
 Notice the reduced duty cycle to compensate for the increased load resistance (less current required for the same voltage). The connected multimeter constantly shows 8V.
 
-The following two oscilloscope shots show the shorting and un-shorting one of the load resistors. Notice that the voltage fluctuates between 6V and 10V, and takes about 0.2 seconds to stabilize. 
+The following two oscilloscope shots show the shorting and un-shorting one of the load resistors. Notice that the voltage fluctuates between 6V and 10V, and takes about 0.2 seconds to stabilize. For the output capacitor I used a 10uF capacitor, which is quite small.
 
 ![](loadChangeRiseSlow.bmp)
 
