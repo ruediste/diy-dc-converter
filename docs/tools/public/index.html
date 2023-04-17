@@ -1,22 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+
+<html lang="{{ site.lang | default: 'en-US' }}">
 
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#000000" />
-  <meta name="description" content="Web site created using create-react-app" />
-  {%- include head.html -%}
+  {% include head.html %}
 </head>
 
 <body>
-  {%- include header.html -%}
-  <main class="page-content" aria-label="Content">
-    <div class="wrapper">
-      {{ content }}
-    </div>
-  </main>
-  {%- include footer.html -%}
+  {% include default_body.html %}
 </body>
 
 </html>

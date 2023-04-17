@@ -1,6 +1,7 @@
 ---
-layout: home
-title: DIY Digital DC Converters
+layout: default
+title: Introduction
+nav_order: 1
 ---
 Welcome, electronic hobbyists! If you're interested in building electronic circuits or projects, you've probably heard the term "DC power converter" before. A DC power converter is an electronic circuit that takes an input DC voltage and converts it to a different output DC voltage. These converters are used in a wide range of applications, from powering small electronic devices to controlling the speed of electric motors. Understanding the basics of DC power converters can open up a world of possibilities for your electronic projects, so let's dive in!
 
@@ -48,12 +49,3 @@ For more advanced designs:
 * A soldering iron and some protoboards
 
 Highly recommended: an entry level oscilloscope (two channel, 200$ range)
-
-## The Converters
-
-{% assign pagelist = site.pages | sort: 'name' %}
-{%- for page in pagelist -%}
-{%- if page.title != "" and page.title!=null and page.dir != "/" -%}
-<a class="page-link" href="{{ page.url | relative_url }}">{{ page.title | escape }}</a> <br/>
-{%- endif -%}
-{%- endfor -%}

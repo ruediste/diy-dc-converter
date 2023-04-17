@@ -59,7 +59,7 @@ public class Optimizer {
         Simulator sim = new Simulator();
         // PowellOptimizer opt = new PowellOptimizer(1e-3, 1e-8);
         var opt = new CMAESOptimizer(10000, 0, false, 10, 10, new JDKRandomGenerator(0), false,
-                new SimplePointChecker<>(1e-2, -1));
+                new SimplePointChecker<>(1e-3, -1));
         var pool = Executors.newFixedThreadPool(8);
         try {
             var result = opt.optimize(GoalType.MINIMIZE, new ObjectiveFunction(new MultivariateFunction() {
@@ -82,7 +82,7 @@ public class Optimizer {
             }), new InitialGuess(
                     parameters.stream().mapToDouble(x -> x.initialGuess).toArray()),
                     new MaxIter(1000), new MaxEval(1000),
-                    new CMAESOptimizer.PopulationSize(15),
+                    new CMAESOptimizer.PopulationSize(30),
                     new CMAESOptimizer.Sigma(parameters.stream().mapToDouble(x -> x.sigma).toArray()),
                     new SimpleBounds(parameters.stream().mapToDouble(x -> x.lowerBound).toArray(),
                             parameters.stream().mapToDouble(x -> x.upperBound).toArray()));

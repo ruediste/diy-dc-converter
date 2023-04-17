@@ -48,7 +48,7 @@ public class Simulations {
         var sim = new Simulator();
 
         var circuitSuppliers = createCircuits();
-        switch (Variant.OPTIMIZE_INDIVIDUAL) {
+        switch (Variant.MANUAL) {
             case MANUAL: {
                 var first = true;
                 for (var circuitSupplier : circuitSuppliers) {
@@ -106,8 +106,8 @@ public class Simulations {
         // design.outputRipple = Voltage.of(0.1);
 
         double vIn = 5;
-        List<Double> vOuts = List.of(12.);
-        List<Double> iOuts = List.of(0.1);
+        List<Double> vOuts = List.of(8.);
+        List<Double> iOuts = List.of(8. / 500.);
         // List<Double> vOuts = List.of(7., 10., 20., 30.);
         // List<Double> iOuts = List.of(0.01, 0.1, 1., 2.);
 
@@ -141,10 +141,10 @@ public class Simulations {
 
                         new Plot(circuit, vOut + " - " + iOut)
                                 .add("Vout", Unit.Volt, circuit.outputVoltage)
-                                .add("IL", Unit.Ampere, circuit.inductorCurrent)
-                                // .add("d", Unit.Number, circuit.duty)
+                                // .add("IL", Unit.Ampere, circuit.inductorCurrent)
+                                .add("d", Unit.Number, circuit.duty)
                                 // .add("sw", Unit.Number, () -> (Double) (circuit.switchOn.get() ? 1. : 0.))
-                                // .add("di", circuit.control.di)
+                                .add("int", Unit.Number, () -> control.integral)
                                 // .add("Error", circuit.control.errorOut)
                                 .add("Cost", Unit.Number, () -> circuit.costCalculator.currentCost)
                         //
@@ -155,7 +155,7 @@ public class Simulations {
                                 break;
                             case LOAD_DROP:
                                 circuit.load.resistance.set(eventTime,
-                                        circuit.load.resistance.get(0) * 1.5);
+                                        circuit.load.resistance.get(0) * 2);
                                 break;
                             case SETPOINT_CHANGE:
                                 control.targetVoltage.set(eventTime, vOut * 0.8);

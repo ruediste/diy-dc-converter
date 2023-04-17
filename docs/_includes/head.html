@@ -1,15 +1,41 @@
-<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta charset="UTF-8">
+<meta http-equiv="X-UA-Compatible" content="IE=Edge">
+
+<link rel="stylesheet" href="{{ '/assets/css/just-the-docs-default.css' | relative_url }}">
+
+{% if site.ga_tracking != nil %}
+{% assign ga_tracking_ids = site.ga_tracking | split: "," %}
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ ga_tracking_ids.first }}"></script>
+<script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+
+    {% for ga_property in ga_tracking_ids %}
+    gtag('config', '{{ ga_property }}'{% unless site.ga_tracking_anonymize_ip == nil %}, { 'anonymize_ip': true }{% endunless %});
+    {% endfor %}
+</script>
+{% endif %}
+
+{% if site.search_enabled != false %}
+<script src="{{ '/assets/js/vendor/lunr.min.js' | relative_url }}"></script>
+{% endif %}
+
+<script src="{{ '/assets/js/just-the-docs.js' | relative_url }}"></script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
-{%- seo -%}
-<link rel="stylesheet" href="{{'/assets/main.css' | relative_url }}">
-{%- feed_meta -%}
-{%- if jekyll.environment == 'production' and site.google_analytics -%}
-{%- include google-analytics.html -%}
-{%- endif -%}
-<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
-<!-- <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script> -->
-<!-- <script id="MathJax-script" async src="/diy-dc-converter/mathjax/tex-mml-chtml.js"></script> -->
-<!-- <script src="{{'/mathjax/polyfill.min.js'|relative_url}}"></script>
-<script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" -->
-<!-- type="text/javascript"></script> -->
+
+{% for file in site.static_files %}
+{% if file.path == site.favicon_ico or file.path == '/favicon.ico' %}
+{% assign favicon = true %}
+{% endif %}
+{% endfor %}
+{% if favicon %}
+<link rel="icon" href="{{ site.favicon_ico | default: '/favicon.ico' | relative_url }}" type="image/x-icon">
+{% endif %}
+
+{% seo %}
+
+{% include head_custom.html %}
+
 <script id="MathJax-script" async src="{{'/mathjax/tex-mml-chtml.js'|relative_url}}"></script>

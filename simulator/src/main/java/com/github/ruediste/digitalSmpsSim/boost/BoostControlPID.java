@@ -17,16 +17,16 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
 
     public StepChangingValue<Double> targetVoltage = new StepChangingValue<>();
 
-    public double kP = 0.0136;
-    public double kI = 0.0049;
-    public double kD = 0.35;
+    public double kP = 9.199e-3;
+    public double kI = 1.318e-2;
+    public double kD = 6.42e-1;
 
-    public double switchingFrequency = 100e3;
-    public double controlFrequency = 50e3;
+    public double switchingFrequency = 7e3;
+    public double controlFrequency = 7e3;
 
     public double lowPass = 4;
 
-    double integral;
+    public double integral;
 
     // ChebyshevI vOutFilter = new ChebyshevI();
     // ChebyshevI vOutFilterSlow = new ChebyshevI();
@@ -57,28 +57,27 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
         controlTimer.onReload = this::control;
     }
 
-    double lastOutputVoltage;
+    double lastError;
 
     private void control(double instant) {
 
         double outAvg = circuit.outputVoltage.get();
-        double outAvgSlow = lastOutputVoltage;
 
-        double errorP = outAvg / targetVoltage.get(instant) - 1;
+        double error = targetVoltage.get(instant) - outAvg;
         if (kI != 0) {
-            integral += errorP;
+            integral += error;
             integral = Math.max(-1 / kI, Math.min(1 / kI, integral));
         }
 
-        double diff = (outAvg - outAvgSlow) / targetVoltage.get(instant);
+        double diff = error - lastError;
 
-        duty = -(errorP * kP + integral * kI + diff * kD);
+        duty = error * kP + integral * kI + diff * kD;
 
-        duty = Math.max(0.01, Math.min(duty, 0.99));
+        duty = Math.max(0.001, Math.min(duty, 0.99));
 
         pwmChannel.compare = (long) (duty * pwmTimer.reload);
 
-        lastOutputVoltage = circuit.outputVoltage.get();
+        lastError = error;
         circuit.duty.set(duty);
     }
 
@@ -86,12 +85,14 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
         var optimizer = new Optimizer();
         return optimizer.optimize(
                 List.of(
-                        new Optimizer.OptimizationParameter<BoostControlPID>("kP", Math.log(kD), 5, -10, 10,
+                        new Optimizer.OptimizationParameter<BoostControlPID>("kP", Math.log(kD), 1, -15, 10,
                                 (c, v) -> c.kP = Math.exp(v)),
-                        new Optimizer.OptimizationParameter<BoostControlPID>("kI", Math.log(kD), 5, -10, 10,
+                        new Optimizer.OptimizationParameter<BoostControlPID>("kI", Math.log(kD), 1, -15, 10,
                                 (c, v) -> c.kI = Math.exp(v)),
-                        new Optimizer.OptimizationParameter<BoostControlPID>("kD", Math.log(kD), 5, -10, 10,
-                                (c, v) -> c.kD = Math.exp(v))),
+                        new Optimizer.OptimizationParameter<BoostControlPID>("kD", Math.log(kD), 1, -15, 10,
+                                (c, v) -> c.kD = Math.exp(v))
+
+                ),
                 circuitSuppliers);
     }
 
@@ -107,17 +108,17 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
 
     @Override
     public String parameterInfo() {
-        return String.format("kP: %f kI: %f kD: %f", kP, kI, kD);
+        return String.format("kP: %.3e kI: %.3e kD: %.3e", kP, kI, kD);
     }
 
     @Override
     public double simulationDuration() {
-        return 50 / controlFrequency;
+        return 1000 / controlFrequency;
     }
 
     @Override
     public double eventTime() {
-        return 5 / controlFrequency;
+        return 500 / controlFrequency;
     }
 
     @Override
@@ -131,7 +132,8 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
         var result = calc.calculate();
         duty = result.duty;
         circuit.duty.initialize(duty);
-        integral = -duty / kI;
+        if (kI != 0)
+            integral = duty / kI;
         circuit.power.iL = result.initialInductorCurrent;
     }
 }

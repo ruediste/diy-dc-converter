@@ -11,15 +11,15 @@ public class Simulator {
         simulate(circuit, finalTime, List.of(plots));
     }
 
-    private void fillPlots(double time, List<Plot> plots, boolean addPoint) {
+    private void fillPlots(double time, double stepDuration, List<Plot> plots, boolean addPoint) {
         for (var plot : plots) {
             if (plot.start != null && time < plot.start)
                 continue;
             if (plot.end != null && time > plot.end)
                 continue;
             for (var series : plot.series) {
-                series.count++;
-                series.sum += series.valueSupplier.get();
+                series.count += stepDuration;
+                series.sum += series.valueSupplier.get() * stepDuration;
             }
             if (addPoint) {
                 var values = new Plot.PlotValues();
@@ -40,7 +40,7 @@ public class Simulator {
         circuit.elements.forEach(e -> e.postInitialize());
         circuit.propagateSignals();
         double time = 0;
-        fillPlots(time, plots, true);
+        fillPlots(time, 1, plots, true);
         double plotPeriod = finalTime / 200;
         double nextPlot = plotPeriod;
         long stepCount = 0;
@@ -66,8 +66,9 @@ public class Simulator {
             if (stepCount == 0)
                 stepEnd = 1e-10;
 
+            double stepDuration = stepEnd - time;
             for (var element : circuit.elements)
-                element.run(time, stepEnd, stepEnd - time);
+                element.run(time, stepEnd, stepDuration);
 
             circuit.propagateSignals();
             circuit.withUpdatedValues.forEach(x -> x.run());
@@ -75,7 +76,7 @@ public class Simulator {
             time = stepEnd;
             {
                 boolean addPoint = time > nextPlot;
-                fillPlots(stepEnd, plots, addPoint);
+                fillPlots(stepEnd, stepDuration, plots, addPoint);
                 if (addPoint) {
                     nextPlot += plotPeriod;
                 }

@@ -38,7 +38,7 @@ public class Plot {
         public int yAxisIndex;
 
         public double sum;
-        public long count;
+        public double count;
 
         public Series(String name, Unit unit, Supplier<Double> valueSupplier) {
             this.name = name;
@@ -88,22 +88,34 @@ public class Plot {
     }
 
     public void finish() {
-        var units = series.stream().map(x -> x.unit).distinct().sorted().toList();
-        axes = units.stream().map(unit -> {
-            var axis = new PlotYAxis();
-            axis.unit = unit;
-            axis.unitSymbol = unit.symbol;
-            return axis;
-        }).toList();
-        for (int i = 0; i < axes.size(); i++) {
-            var axis = axes.get(i);
-            axis.index = i;
+        if (false) {
+            var units = series.stream().map(x -> x.unit).distinct().sorted().toList();
+            axes = units.stream().map(unit -> {
+                var axis = new PlotYAxis();
+                axis.unit = unit;
+                axis.unitSymbol = unit.symbol;
+                return axis;
+            }).toList();
+            for (int i = 0; i < axes.size(); i++) {
+                var axis = axes.get(i);
+                axis.index = i;
+            }
+            var axisByUnit = axes.stream().collect(Collectors.toMap(x -> x.unit, x -> x));
+            for (var s : series) {
+                s.yAxisIndex = axisByUnit.get(s.unit).index;
+            }
+        } else {
+            for (int i = 0; i < series.size(); i++) {
+                var s = series.get(i);
+                var axis = new PlotYAxis();
+                axis.unit = s.unit;
+                axis.unitSymbol = s.name + "[" + s.unit.symbol + "]";
+                axis.index = i;
+                s.yAxisIndex = i;
+                axes.add(axis);
+            }
         }
 
-        var axisByUnit = axes.stream().collect(Collectors.toMap(x -> x.unit, x -> x));
-        for (var s : series) {
-            s.yAxisIndex = axisByUnit.get(s.unit).index;
-        }
         axes.stream().skip(axes.size() / 2).forEach(a -> a.isRight = true);
 
         series.forEach(s -> {

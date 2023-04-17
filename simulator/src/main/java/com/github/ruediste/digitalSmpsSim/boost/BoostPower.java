@@ -12,10 +12,10 @@ public class BoostPower extends CircuitElement {
         this.circuit = circuit;
     }
 
-    public double iL = 0;
+    public double iL;
 
-    public double inductance = 150e-6;
-    public double capacitance = 100e-7;
+    public double inductance = 3.76e-3;
+    public double capacitance = 10e-6;
 
     @Override
     public void initialize() {

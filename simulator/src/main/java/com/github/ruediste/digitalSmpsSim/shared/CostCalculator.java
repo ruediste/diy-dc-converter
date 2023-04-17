@@ -10,70 +10,52 @@ public class CostCalculator extends CircuitElement {
         this.circuit = circuit;
     }
 
-    public double evaluationPeriod;
+    public double evaluationPeriod = 1 / 10e3;;
 
-    public double firstEvaluation = 0;
-    public double nextEvaluation;
+    public double nextEvaluation = 0;
 
     public double totalCost;
     public double currentCost;
 
-    double kError = 1;
-    double kDiff = 0;
-    double kDiffDuty = 0; // 1000;
-    double kCurrent = 0;
+    double kError = 100;
+    double kDiff = 1;
+    double kDiffDuty = 1;
 
     double alpha = 0.1;
 
     double avgOutputVoltage;
-    double avgCurrent;
-    double avgDuty;
+    double lastDuty;
 
     @Override
-    public void initialize() {
-        nextEvaluation = firstEvaluation;
+    public void postInitialize() {
+        avgOutputVoltage = circuit.control.targetValue(0);
+        lastDuty = circuit.duty.get();
     }
 
     @Override
     public void run(double stepStart, double stepEnd, double stepDuration) {
-        if (stepStart >= nextEvaluation) {
+        while (stepStart > nextEvaluation) {
+
             var value = circuit.control.actualValue();
-            var current = circuit.inductorCurrent.get();
 
             var cost = 0.;
 
             // error squared
-            if (false) {
-                var tmp = value / circuit.control.targetValue(stepStart);
-                if (tmp < 1) {
-                    tmp = Math.max(0.1, 1 / tmp);
-                }
-                cost += kError * (Math.pow(tmp, 2)
-                        - 1);
-            }
-            cost += kError * Math.pow(value - circuit.control.targetValue(stepStart), 2);
+            cost += kError * Math.pow(value - circuit.control.targetValue(stepEnd), 2);
 
             // differentiation
             cost += kDiff * Math.pow(value - avgOutputVoltage, 2);
 
-            // difference from avg current
-            if (avgCurrent > 1e-3) {
-                var currentRatio = current / avgCurrent;
-                if (currentRatio < 1)
-                    currentRatio = 1 - currentRatio;
-                cost += kCurrent * (currentRatio - 1);
-            }
-
             // duty diff
-            cost += kDiffDuty * Math.pow(circuit.control.duty - avgDuty, 2);
+            cost += kDiffDuty * Math.pow(circuit.duty.get() - lastDuty, 2);
 
             totalCost += cost * stepDuration;
             currentCost = cost;
 
-            nextEvaluation += evaluationPeriod;
             avgOutputVoltage = value * alpha + (1 - alpha) * avgOutputVoltage;
-            avgCurrent = current * alpha + (1 - alpha) * avgCurrent;
-            avgDuty = circuit.duty.get() * alpha + (1 - alpha) * avgDuty;
+            lastDuty = circuit.duty.get();
+
+            nextEvaluation += evaluationPeriod;
         }
     }
 }

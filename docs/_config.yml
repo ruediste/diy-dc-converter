@@ -22,11 +22,12 @@ title: DIY DC Converter
 email: ruediste@gmail.com
 
 baseurl: "/diy-dc-converter" # the subpath of your site, e.g. /blog
-url: "" # the base hostname & protocol for your site, e.g. http://example.com
+url: "https://ruediste.github.io" # the base hostname & protocol for your site, e.g. http://example.com
 github_username:  ruediste
+repository: "ruediste/diy-dc-converter"
 
 # Build settings
-theme: minima
+theme: just-the-docs
 plugins:
   - jekyll-feed
 
@@ -34,6 +35,7 @@ header_pages: ['dummy']
 
 exclude:
   - tools
+  - vendor
 
 # Exclude from processing.
 # The following items will not be processed, by default.

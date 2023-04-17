@@ -1,5 +1,6 @@
 ---
 title: 'Getting Started: Boost Converter'
+nav_order: 10
 ---
 
 * TOC

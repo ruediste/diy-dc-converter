@@ -1,5 +1,6 @@
 ---
 title: 'Simple Control'
+nav_order: 20
 ---
 
 * TOC
