@@ -31,9 +31,6 @@ public class PidControlMode extends Mode<PidControlMode.Settings> {
         public int pwmPrescale;
 
         @Datatype.uint16
-        public int pwmMaxCompare;
-
-        @Datatype.uint16
         public int ctrlReload;
 
         @Datatype.uint16
@@ -45,6 +42,10 @@ public class PidControlMode extends Mode<PidControlMode.Settings> {
         public float kP;
         public float kI;
         public float kD;
+        public float maxDuty;
+
+        @Datatype.int32
+        public int maxIntegral;
 
         public boolean running;
 
@@ -145,12 +146,18 @@ public class PidControlMode extends Mode<PidControlMode.Settings> {
                     var pwm = calc.calculate(settings.frequencyPwm, settings.maxDuty);
                     msg.pwmReload = (int) pwm.reload;
                     msg.pwmPrescale = (int) pwm.prescale;
-                    msg.pwmMaxCompare = (int) pwm.compare;
                 }
                 msg.targetAdc = settings.targetAdc;
                 msg.kP = (float) settings.kP;
                 msg.kI = (float) settings.kI;
                 msg.kD = (float) settings.kD;
+                msg.maxDuty = (float) settings.maxDuty;
+
+                if (settings.kI == 0 || 1 / settings.kI > Integer.MAX_VALUE)
+                    msg.maxIntegral = Integer.MAX_VALUE;
+                else
+                    msg.maxIntegral = (int) (1 / settings.kI);
+
                 msg.adcSampleCycles = (byte) settings.adcSampleCycles;
                 msg.running = settings.running;
                 return msg;

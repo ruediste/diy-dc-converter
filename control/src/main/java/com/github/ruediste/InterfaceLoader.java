@@ -121,6 +121,16 @@ public class InterfaceLoader {
                             }, in -> {
                                 return in.read() | in.read() << 8;
                             });
+                        } else if (Datatype.int32.class.getName().equals(annotation.getName())) {
+                            interfaceField.setType("int32_t", 4, (obj, out) -> {
+                                var value = (Integer) obj;
+                                out.write(value);
+                                out.write(value >> 8);
+                                out.write(value >> 16);
+                                out.write(value >> 24);
+                            }, in -> {
+                                return in.read() | in.read() << 8 | in.read() << 16 | in.read() << 24;
+                            });
                         } else {
                             throw new RuntimeException("Unknown annotation " + annotation.getName() + " on "
                                     + info.getName() + "." + field.getName());

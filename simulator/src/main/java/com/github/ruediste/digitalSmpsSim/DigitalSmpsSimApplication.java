@@ -5,14 +5,9 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.Scrollable;
 import javax.swing.SwingConstants;
 import java.awt.BorderLayout;
-import java.awt.Dimension;
-import java.awt.FlowLayout;
-import java.awt.GridBagLayout;
 import java.awt.GridLayout;
-import java.awt.Rectangle;
 import java.util.stream.Collectors;
 
 import org.knowm.xchart.XChartPanel;
@@ -109,46 +104,5 @@ public class DigitalSmpsSimApplication {
 				frame.setVisible(true);
 			}
 		});
-	}
-
-	private static class PlotsPanel extends JPanel implements Scrollable {
-
-		@Override
-		public Dimension getPreferredScrollableViewportSize() {
-			Dimension result = new Dimension();
-			for (var component : getComponents()) {
-				var componentSize = component.getPreferredSize();
-				result.width += componentSize.width;
-				result.height += componentSize.height;
-			}
-			return result;
-		}
-
-		@Override
-		public Dimension getPreferredSize() {
-			// TODO Auto-generated method stub
-			return super.getPreferredSize();
-		}
-
-		@Override
-		public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
-			return 1;
-		}
-
-		@Override
-		public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
-			return 10;
-		}
-
-		@Override
-		public boolean getScrollableTracksViewportWidth() {
-			return true;
-		}
-
-		@Override
-		public boolean getScrollableTracksViewportHeight() {
-			return true;
-		}
-
 	}
 }

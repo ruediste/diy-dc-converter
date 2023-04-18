@@ -144,7 +144,7 @@ public class Simulations {
                                 // .add("IL", Unit.Ampere, circuit.inductorCurrent)
                                 .add("d", Unit.Number, circuit.duty)
                                 // .add("sw", Unit.Number, () -> (Double) (circuit.switchOn.get() ? 1. : 0.))
-                                .add("int", Unit.Number, () -> control.integral)
+                                .add("int", Unit.Number, () -> (double) control.integral)
                                 // .add("Error", circuit.control.errorOut)
                                 .add("Cost", Unit.Number, () -> circuit.costCalculator.currentCost)
                         //

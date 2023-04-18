@@ -17,16 +17,16 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
 
     public StepChangingValue<Double> targetVoltage = new StepChangingValue<>();
 
-    public double kP = 4.216e-1;
-    public double kI = 1.46e-2;
-    public double kD = 8.185e-3;
+    public double kP = 1.016e-3;
+    public double kI = 1.438e-4;
+    public double kD = 1.369e-3;
 
     public double switchingFrequency = 7e3;
     public double controlFrequency = 7e3;
 
     public double lowPass = 4;
 
-    public double integral;
+    public int integral;
 
     // ChebyshevI vOutFilter = new ChebyshevI();
     // ChebyshevI vOutFilterSlow = new ChebyshevI();
@@ -57,16 +57,22 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
         controlTimer.onReload = this::control;
     }
 
-    double lastError;
+    int lastError;
+
+    private int voltageToAdc(double voltage) {
+        double maxVoltage = 20;
+        return (int) (voltage / maxVoltage * 4096);
+    }
 
     private void control(double instant) {
 
-        double outAvg = circuit.outputVoltage.get();
+        int adc = voltageToAdc(circuit.outputVoltage.get());
 
-        double error = targetVoltage.get(instant) - outAvg;
+        int error = voltageToAdc(targetVoltage.get(instant)) - adc;
         if (kI != 0) {
             integral += error;
-            integral = Math.max(-1 / kI, Math.min(1 / kI, integral));
+            int maxIntegral = (int) (1 / kI);
+            integral = Math.max(-maxIntegral, Math.min(maxIntegral, integral));
         }
 
         double diff = error - lastError;
@@ -74,14 +80,14 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
         duty = error * kP + integral * kI + diff * kD;
 
         if (error < 0.05) {
-            // integral += 3 * error;
+            // integral += error;
         }
 
         duty = Math.max(0.001, Math.min(duty, 0.99));
 
-        pwmChannel.compare = (long) (duty * pwmTimer.reload);
-
         lastError = error;
+
+        pwmChannel.compare = (long) (duty * pwmTimer.reload);
         circuit.duty.set(duty);
     }
 
@@ -137,7 +143,7 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
         duty = result.duty;
         circuit.duty.initialize(duty);
         if (kI != 0)
-            integral = duty / kI;
+            integral = (int) (duty / kI);
         circuit.power.iL = result.initialInductorCurrent;
     }
 }

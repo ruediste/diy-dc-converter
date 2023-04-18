@@ -227,9 +227,8 @@ namespace PidControlMode
     PidControlConfigMessage config;
 
     float duty = 0;
-    float integral;
-    float kIInv;
-    float lastError;
+    int32_t integral;
+    int32_t lastError;
 
     uint32_t lastStatusSend = 0;
 
@@ -238,27 +237,20 @@ namespace PidControlMode
         uint16_t adcValues[ControlMain::adcChannelCount];
         ControlMain::readADCValues(1, adcValues);
 
-        auto outAvg = adcValues[0];
-        int32_t error = config.targetAdc - outAvg;
-        float errorF = error * 8. / 1600.;
+        auto adc = adcValues[0];
+        int32_t error = config.targetAdc - adc;
 
-        integral += errorF;
-        integral = std::max(-kIInv, std::min(kIInv, integral));
+        integral += error;
+        integral = std::max(-config.maxIntegral, std::min(config.maxIntegral, integral));
 
-        float diff = errorF - lastError;
+        float diff = error - lastError;
 
-        duty = errorF * config.kP + integral * config.kI + diff * config.kD;
+        duty = error * config.kP + integral * config.kI + diff * config.kD;
 
-        duty = std::max(0.0f, std::min(duty, 1.0f));
-        lastError = errorF;
+        duty = std::max(0.0f, std::min(duty, config.maxDuty));
+        lastError = error;
 
-        uint16_t compareValue = duty * TIM1->ARR;
-        if (compareValue > config.pwmMaxCompare)
-        {
-            compareValue = config.pwmMaxCompare;
-            duty = config.pwmMaxCompare / (double)TIM1->ARR;
-        }
-        TIM1->CCR1 = compareValue;
+        TIM1->CCR1 = duty * TIM1->ARR;
     }
 
     void main()
@@ -305,7 +297,6 @@ namespace PidControlMode
         TIM9->ARR = config->ctrlReload;
 
         PidControlMode::config = *config;
-        kIInv = 1 / config->kI;
         lastError = 0;
         integral = 0;
 
