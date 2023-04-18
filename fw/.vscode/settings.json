@@ -3,8 +3,10 @@
         "DIER",
         "hadc",
         "htim",
+        "JSWSTART",
         "NDTR",
         "prescale",
-        "SMPR"
+        "SMPR",
+        "USBD"
     ]
 }

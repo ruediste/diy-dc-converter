@@ -15,6 +15,9 @@ public abstract class CircuitElement {
     public void postInitialize() {
     }
 
+    public void finish() {
+    }
+
     public Double stepEndTime(double stepStart) {
         return null;
     }

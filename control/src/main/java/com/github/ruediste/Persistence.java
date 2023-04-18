@@ -17,6 +17,7 @@ public class Persistence {
     public HTreeMap<String, Serializable> settings;
     public Var<Boolean> autoSend;
 
+    @SuppressWarnings("unchecked")
     public void initialize() {
         db = DBMaker.fileDB("control.db").transactionEnable().make();
         currentMode = db.atomicVar("currentMode", Serializer.STRING).createOrOpen();

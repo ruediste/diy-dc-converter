@@ -17,9 +17,9 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
 
     public StepChangingValue<Double> targetVoltage = new StepChangingValue<>();
 
-    public double kP = 9.199e-3;
-    public double kI = 1.318e-2;
-    public double kD = 6.42e-1;
+    public double kP = 4.216e-1;
+    public double kI = 1.46e-2;
+    public double kD = 8.185e-3;
 
     public double switchingFrequency = 7e3;
     public double controlFrequency = 7e3;
@@ -73,6 +73,10 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
 
         duty = error * kP + integral * kI + diff * kD;
 
+        if (error < 0.05) {
+            // integral += 3 * error;
+        }
+
         duty = Math.max(0.001, Math.min(duty, 0.99));
 
         pwmChannel.compare = (long) (duty * pwmTimer.reload);
@@ -113,12 +117,12 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
 
     @Override
     public double simulationDuration() {
-        return 1000 / controlFrequency;
+        return 500 / controlFrequency;
     }
 
     @Override
     public double eventTime() {
-        return 500 / controlFrequency;
+        return 250 / controlFrequency;
     }
 
     @Override

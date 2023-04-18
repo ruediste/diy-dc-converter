@@ -84,6 +84,7 @@ public class Simulator {
             stepCount++;
         }
 
+        circuit.elements.forEach(e -> e.finish());
         plots.forEach(p -> p.finish());
     }
 }

@@ -3,6 +3,7 @@
 #include <string.h>
 #include "main.h"
 #include "USB_DEVICE/App/usbd_cdc_if.h"
+#include <algorithm>
 
 template <typename T>
 struct MessageBuffer
@@ -101,9 +102,10 @@ namespace ControlMain
         int offset = adcBufCount - DMA2_Stream0->NDTR;
         for (int i = adcBufCount - nAvg * adcChannelCount; i < adcBufCount; i++)
         {
-            auto value = adcBuf[(i + offset) % adcBufCount];
-            adcValues[(i + offset) % adcChannelCount] += value;
-            adcCounts[(i + offset) % adcChannelCount]++;
+            int bufIdx = (i + offset) % adcBufCount;
+            auto value = adcBuf[bufIdx];
+            adcValues[bufIdx % adcChannelCount] += value;
+            adcCounts[bufIdx % adcChannelCount]++;
         }
         __enable_irq();
 
@@ -219,17 +221,46 @@ namespace SimpleControlMode
     }
 }
 
-namespace DcmBoostPid
+namespace PidControlMode
 {
 
-    volatile int controlCount;
+    PidControlConfigMessage config;
+
+    float duty = 0;
+    float integral;
+    float kIInv;
+    float lastError;
+
+    uint32_t lastStatusSend = 0;
 
     void control()
     {
-        controlCount++;
+        uint16_t adcValues[ControlMain::adcChannelCount];
+        ControlMain::readADCValues(1, adcValues);
+
+        auto outAvg = adcValues[0];
+        int32_t error = config.targetAdc - outAvg;
+        float errorF = error * 8. / 1600.;
+
+        integral += errorF;
+        integral = std::max(-kIInv, std::min(kIInv, integral));
+
+        float diff = errorF - lastError;
+
+        duty = errorF * config.kP + integral * config.kI + diff * config.kD;
+
+        duty = std::max(0.0f, std::min(duty, 1.0f));
+        lastError = errorF;
+
+        uint16_t compareValue = duty * TIM1->ARR;
+        if (compareValue > config.pwmMaxCompare)
+        {
+            compareValue = config.pwmMaxCompare;
+            duty = config.pwmMaxCompare / (double)TIM1->ARR;
+        }
+        TIM1->CCR1 = compareValue;
     }
 
-    uint32_t lastStatusSend = 0;
     void main()
     {
         auto now = HAL_GetTick();
@@ -238,12 +269,12 @@ namespace DcmBoostPid
             lastStatusSend = now;
 
             {
-                MessageBuffer<DcmBoostPidStatusMessage> buf(MessageType::DcmBoostPidStatusMessage);
+                MessageBuffer<PidControlStatusMessage> buf(MessageType::PidControlStatusMessage);
 
                 uint16_t adcValues[ControlMain::adcChannelCount];
                 ControlMain::readADCValues(2, adcValues);
-                buf.msg.adc0 = adcValues[0];
-                buf.msg.adc1 = adcValues[1];
+                buf.msg.compareValue = TIM1->CCR1;
+                buf.msg.duty = duty;
                 while (CDC_Transmit_FS(buf.bytes(), sizeof(buf)) == USBD_BUSY)
                     ;
             }
@@ -263,19 +294,24 @@ namespace DcmBoostPid
         }
     }
 
-    void handle(DcmBoostPidConfigMessage *config)
+    void handle(PidControlConfigMessage *config)
     {
         TIM1->ARR = config->pwmReload;
         TIM1->PSC = config->pwmPrescale;
-        TIM1->CCR1 = config->pwmReload / 8;
+        TIM1->CCR1 = 0;
         TIM1->CCR3 = 10;
 
         TIM9->PSC = config->ctrlPrescale;
         TIM9->ARR = config->ctrlReload;
 
+        PidControlMode::config = *config;
+        kIInv = 1 / config->kI;
+        lastError = 0;
+        integral = 0;
+
+        ControlMain::setAdcSampleCycles(config->adcSampleCycles);
         ControlMain::controlHandler = control;
         ControlMain::mainHandler = main;
-        controlCount = 0;
 
         ControlMain::startTimers();
         ControlMain::startStopPWMOutput(config->running);
@@ -296,8 +332,8 @@ namespace ControlMain
         case MessageType::PWMModeConfigMessage:
             PWMMode::handle((PWMModeConfigMessage *)(aggregationBuffer + 1));
             break;
-        case MessageType::DcmBoostPidConfigMessage:
-            DcmBoostPid::handle((DcmBoostPidConfigMessage *)(aggregationBuffer + 1));
+        case MessageType::PidControlConfigMessage:
+            PidControlMode::handle((PidControlConfigMessage *)(aggregationBuffer + 1));
             break;
         case MessageType::SimpleControlConfigMessage:
             SimpleControlMode::handle((SimpleControlConfigMessage *)(aggregationBuffer + 1));
@@ -339,9 +375,12 @@ namespace ControlMain
         }
     }
 
+    uint16_t controlCyclesUsed;
+
     void onControlLoop()
     {
         controlHandler();
+        controlCyclesUsed = TIM9->CNT;
     }
 
     uint32_t lastStatusSend = 0;
@@ -355,8 +394,9 @@ namespace ControlMain
             lastStatusSend = now;
 
             {
-                MessageBuffer<AdcValuesMessage> buf(MessageType::AdcValuesMessage);
-                readADCValues(1, buf.msg.values);
+                MessageBuffer<SystemStatusMessage> buf(MessageType::SystemStatusMessage);
+                readADCValues(1, buf.msg.adcValues);
+                buf.msg.controlCpuUsageFraction = controlCyclesUsed / (float)TIM9->ARR;
                 while (CDC_Transmit_FS(buf.bytes(), sizeof(buf)) == USBD_BUSY)
                     ;
             }

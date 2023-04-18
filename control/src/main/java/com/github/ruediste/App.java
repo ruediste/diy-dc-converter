@@ -1,6 +1,5 @@
 package com.github.ruediste;
 
-import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -58,12 +57,13 @@ public class App {
     JPanel modeContainer;
     JCheckBox autoSend;
     JLabel[] debugLabels = new JLabel[4];
-    JLabel adcValuesLabel = new JLabel();
+    JLabel systemStatusLabel = new JLabel();
 
     private class ModeInstanceController<TSettings extends Serializable> {
         ModeInstance<TSettings> instance;
         TSettings settings;
 
+        @SuppressWarnings("unchecked")
         ModeInstanceController(Mode<TSettings> mode) {
             try {
                 settings = (TSettings) persistence.settings.get(mode.name);
@@ -142,8 +142,9 @@ public class App {
                     for (int i = 0; i < debugLabels.length; i++) {
                         debugLabels[i].setText(RealSerialConnection.hexDump(dbg.data, i * 4, 4));
                     }
-                } else if (msg instanceof AdcValuesMessage adc) {
-                    adcValuesLabel.setText("ADC0: " + adc.values[0] + " ADC1: " + adc.values[1]);
+                } else if (msg instanceof SystemStatusMessage status) {
+                    systemStatusLabel.setText("ADC0: " + status.adcValues[0] + " ADC1: " + status.adcValues[1]
+                            + "CPU: %.2f%%".formatted(status.controlCpuUsageFraction * 100));
                 } else
                     modeInstanceController.handle(msg);
             });
@@ -236,7 +237,7 @@ public class App {
             mainPanel.add(debugContainer);
         }
 
-        mainPanel.add(adcValuesLabel);
+        mainPanel.add(systemStatusLabel);
 
         // Display the window.
         frame.pack();
