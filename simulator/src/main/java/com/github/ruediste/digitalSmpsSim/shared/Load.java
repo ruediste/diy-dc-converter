@@ -16,12 +16,12 @@ public class Load extends CircuitElement {
 
     @Override
     public void initialize() {
-        circuit.outputCurrent.set(0.);
+        circuit.loadCurrent.set(0.);
     }
 
     @Override
     public void run(double stepStart, double stepEnd, double stepDuration) {
-        circuit.outputCurrent.set(calculateCurrent(circuit.outputVoltage.get(), stepEnd));
+        circuit.loadCurrent.set(calculateCurrent(circuit.outputVoltage.get(), stepEnd));
     }
 
     public double calculateCurrent(double voltage, double instant) {

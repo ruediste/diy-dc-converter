@@ -50,8 +50,8 @@ public class BoostPower extends CircuitElement {
         else
             iC = (iL + iLOld) / 2; // average inductor current
 
-        iC = iC - circuit.outputCurrent.get(); // no matter of the switch position, the load current is always drawn
-                                               // from the
+        iC = iC - circuit.loadCurrent.get(); // no matter of the switch position, the load current is always drawn
+                                             // from the
         // capacitor
 
         // I=C*dv/dt; dv=I*dt/C

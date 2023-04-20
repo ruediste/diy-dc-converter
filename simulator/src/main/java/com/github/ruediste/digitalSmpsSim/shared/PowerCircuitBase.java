@@ -16,6 +16,6 @@ public class PowerCircuitBase extends Circuit {
     public SimulationValue<Double> loadCurrent = new SimulationValue<>(this, 0.);
     public SimulationValue<Double> outputVoltage = new SimulationValue<>(this, 0.);
     public SimulationValue<Double> inductorCurrent = new SimulationValue<>(this, 0.);
-    public SimulationValue<Double> outputCurrent = new SimulationValue<>(this, 0.);
+    public SimulationValue<Double> loadCurrent = new SimulationValue<>(this, 0.);
     public SimulationValue<Double> duty = new SimulationValue<>(this, 0.);
 }

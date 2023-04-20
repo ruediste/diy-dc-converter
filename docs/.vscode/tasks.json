@@ -5,6 +5,11 @@
 			"label": "jekyll: start",
 			"type": "shell",
 			"command": "bundle exec jekyll serve --livereload",
+			"options": {
+				"env": {
+					"PATH": "~/gems/bin/:$PATH"
+				}
+			},
 			"problemMatcher": [],
 		},
 		{

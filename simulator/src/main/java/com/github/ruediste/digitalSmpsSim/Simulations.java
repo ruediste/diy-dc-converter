@@ -48,7 +48,7 @@ public class Simulations {
         var sim = new Simulator();
 
         var circuitSuppliers = createCircuits();
-        switch (Variant.OPTIMIZE_INDIVIDUAL) {
+        switch (Variant.MANUAL) {
             case MANUAL: {
                 var first = true;
                 for (var circuitSupplier : circuitSuppliers) {
