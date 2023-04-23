@@ -132,7 +132,7 @@ public class Simulations {
 
                         circuit.source.voltage.set(0, vIn);
                         circuit.load.resistance.set(0, vOut / iOut);
-                        circuit.outputVoltage.set(vOut);
+                        circuit.outputVoltage.initialize(vOut);
                         control.targetVoltage.set(0, vOut);
 
                         control.initializeSteadyState();
@@ -142,11 +142,13 @@ public class Simulations {
                         new Plot(circuit, vOut + " - " + iOut)
                                 .add("Vout", Unit.Volt, circuit.outputVoltage)
                                 // .add("IL", Unit.Ampere, circuit.inductorCurrent)
-                                .add("d", Unit.Number, circuit.duty)
-                                // .add("sw", Unit.Number, () -> (Double) (circuit.switchOn.get() ? 1. : 0.))
-                                .add("int", Unit.Number, () -> (double) control.integral)
-                                // .add("Error", circuit.control.errorOut)
-                                .add("Cost", Unit.Number, () -> circuit.costCalculator.currentCost)
+                                .add("Duty", Unit.Number, circuit.duty)
+                        // .add("sw", Unit.Number, () -> (Double) (circuit.switchOn.get() ? 1. : 0.))
+                        // .add("int", Unit.Number, () -> (double) control.integral)
+                        // .add("Vm", Unit.Number, () -> (double) control.measuredVoltage)
+                        // .add("Error", circuit.control.errorOut)
+                        // .add("Cost", Unit.Number, () -> circuit.costCalculator.currentCost)
+                        // .add("tCost", Unit.Number, () -> circuit.costCalculator.totalCost)
                         //
                         ;
                         switch (event) {

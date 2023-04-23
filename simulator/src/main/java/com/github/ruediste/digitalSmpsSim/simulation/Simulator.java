@@ -38,7 +38,7 @@ public class Simulator {
         circuit.initialize();
         circuit.elements.forEach(e -> e.initialize());
         circuit.elements.forEach(e -> e.postInitialize());
-        circuit.propagateSignals();
+        circuit.propagateValues();
         double time = 0;
         fillPlots(time, 1, plots, true);
         double plotPeriod = finalTime / 200;
@@ -70,7 +70,7 @@ public class Simulator {
             for (var element : circuit.elements)
                 element.run(time, stepEnd, stepDuration);
 
-            circuit.propagateSignals();
+            circuit.propagateValues();
             circuit.withUpdatedValues.forEach(x -> x.run());
             circuit.withUpdatedValues.clear();
             time = stepEnd;

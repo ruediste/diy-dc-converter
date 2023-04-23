@@ -2,15 +2,23 @@ package com.github.ruediste.mode;
 
 import java.awt.Component;
 import java.awt.GridLayout;
+import java.io.PrintWriter;
 import java.io.Serializable;
 
 import javax.swing.JLabel;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.swing.*;
 
 import com.github.ruediste.InterfaceMessage;
+import com.google.common.base.Charsets;
+import com.github.ruediste.BlobMessage;
 import com.github.ruediste.Datatype;
 
 public class PidControlMode extends Mode<PidControlMode.Settings> {
+    private final Logger log = LoggerFactory.getLogger(PidControlMode.class);
 
     public PidControlMode() {
         super("PID Control Mode");
@@ -131,10 +139,26 @@ public class PidControlMode extends Mode<PidControlMode.Settings> {
                     statusLabel.setText("compare: " + status.compareValue + " duty: " + status.duty);
                 }
 
+                if (msg instanceof BlobMessage blob) {
+                    try (var writer = new PrintWriter("data.csv", Charsets.UTF_8)) {
+                        writer.println("adc, compare");
+                        for (int i = 0; i + 6 <= blob.data.length;) {
+                            int adc = blob.readUint16(i);
+                            i += 2;
+                            long integral = blob.readUint32(i);
+                            i += 4;
+                            writer.println(adc + "," + integral);
+                        }
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                    log.info("Blob received");
+                }
+
             }
 
             @Override
-            public Object toConfigMessage(Settings settings) {
+            public InterfaceMessage toConfigMessage(Settings settings) {
                 var calc = new PwmValuesCalculator();
                 var msg = new PidControlConfigMessage();
                 {

@@ -19,7 +19,7 @@ public class Circuit {
         this.elements.add(element);
     }
 
-    public void propagateSignals() {
+    public void propagateValues() {
         values.forEach(v -> v.transferNextValue());
     }
 

@@ -15,11 +15,14 @@ public class BoostPower extends CircuitElement {
     public double iL;
 
     public double inductance = 3.76e-3;
-    public double capacitance = 10e-6;
+    public double capacitance = 100e-6;
+    public double diodeForwardVoltageDrop = 0.2;
+    public double capacitorVoltage;
+    public double capacitorESR = 0.1;
 
     @Override
     public void initialize() {
-
+        capacitorVoltage = circuit.outputVoltage.get();
     }
 
     private double inductorVoltage() {
@@ -27,7 +30,8 @@ public class BoostPower extends CircuitElement {
         if (circuit.switchOn.get()) {
             return vIn;
         } else {
-            return vIn - circuit.outputVoltage.get();
+            return vIn - (circuit.outputVoltage.get() + diodeForwardVoltageDrop
+                    + capacitorESR * (iL - circuit.loadCurrent.get()));
         }
     }
 
@@ -51,14 +55,13 @@ public class BoostPower extends CircuitElement {
             iC = (iL + iLOld) / 2; // average inductor current
 
         iC = iC - circuit.loadCurrent.get(); // no matter of the switch position, the load current is always drawn
-                                             // from the
-        // capacitor
+                                             // from the capacitor
 
         // I=C*dv/dt; dv=I*dt/C
-        double vOut = circuit.outputVoltage.get();
-        vOut += iC * stepDuration / capacitance;
+        capacitorVoltage += iC * stepDuration / capacitance;
 
-        circuit.outputVoltage.set(vOut);
+        // apply capacitor internal resistance
+        circuit.outputVoltage.set(capacitorVoltage + capacitorESR * iC);
         circuit.inductorCurrent.set(iL);
     }
 

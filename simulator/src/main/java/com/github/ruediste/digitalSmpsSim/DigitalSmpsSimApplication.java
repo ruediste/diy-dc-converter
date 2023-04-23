@@ -35,7 +35,7 @@ public class DigitalSmpsSimApplication {
 
 			for (var plot : circuit.plots) {
 				// Create Chart
-				final XYChart chart = new XYChartBuilder().width(1200).height(400).title(plot.title)
+				final XYChart chart = new XYChartBuilder().width(800).height(400).title(plot.title)
 						.xAxisTitle("Time [" + plot.timePrefix.symbol + "s]")
 						.build();
 				// Customize Chart
@@ -77,7 +77,7 @@ public class DigitalSmpsSimApplication {
 			public void run() {
 
 				// Create and set up the window.
-				JFrame frame = new JFrame("Advanced Example");
+				JFrame frame = new JFrame("DIY DC-DC Simulator");
 				frame.setLayout(new BorderLayout());
 				frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
@@ -95,8 +95,8 @@ public class DigitalSmpsSimApplication {
 				circuits.forEach(plotsPanel::add);
 
 				// label
-				JLabel label = new JLabel("Blah blah blah.", SwingConstants.CENTER);
-				frame.add(label, BorderLayout.SOUTH);
+				// JLabel label = new JLabel("Blah blah blah.", SwingConstants.CENTER);
+				// frame.add(label, BorderLayout.SOUTH);
 
 				// Display the window.
 				frame.setExtendedState(JFrame.MAXIMIZED_BOTH);

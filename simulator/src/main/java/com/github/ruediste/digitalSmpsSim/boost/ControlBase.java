@@ -1,11 +1,14 @@
 package com.github.ruediste.digitalSmpsSim.boost;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import com.github.ruediste.digitalSmpsSim.shared.PowerCircuitBase;
 import com.github.ruediste.digitalSmpsSim.simulation.CircuitElement;
+import com.google.common.collect.EvictingQueue;
 
 public abstract class ControlBase<TCircuit extends PowerCircuitBase> extends CircuitElement {
     protected final TCircuit circuit;
@@ -17,7 +20,10 @@ public abstract class ControlBase<TCircuit extends PowerCircuitBase> extends Cir
     public final HardwareTimer.Channel adcChannel;
     public final HardwareTimer controlTimer;
 
-    double measuredOutputVoltage;
+    private List<EvictingQueue<Double>> adcQueues;
+    private long adcIteration;
+
+    public double measuredVoltage;
 
     protected ControlBase(TCircuit circuit) {
         super(circuit);
@@ -29,11 +35,28 @@ public abstract class ControlBase<TCircuit extends PowerCircuitBase> extends Cir
         });
         adcChannel = pwmTimer.createChannel((instant) -> circuit
                 .withUpdatedValues(
-                        () -> measuredOutputVoltage = circuit.outputVoltage.get()));
+                        () -> {
+                            if ((adcIteration % adcQueues.size()) == 0) {
+
+                                double voltage = circuit.outputVoltage.get();
+                                adcQueues.get(0).add(voltage);
+                                measuredVoltage = voltage;
+                            }
+                            adcIteration++;
+                        }));
         pwmTimer.onReload = (instant) -> {
             circuit.switchOn.set(true);
         };
         circuit.switchOn.initialize(true);
+
+        adcQueues = new ArrayList<>();
+        for (int i = 0; i < 2; i++) {
+            EvictingQueue<Double> queue = EvictingQueue.create(4);
+            adcQueues.add(queue);
+            while (queue.remainingCapacity() > 0)
+                queue.add(0.);
+        }
+
     }
 
     public abstract double targetValue(double instant);
@@ -52,4 +75,30 @@ public abstract class ControlBase<TCircuit extends PowerCircuitBase> extends Cir
     public abstract void initializeSteadyState();
 
     public abstract <T extends PowerCircuitBase> Consumer<T> optimize(List<Supplier<T>> circuitSuppliers);
+
+    protected final void fillAdcChannel(int channel, double value) {
+        var queue = adcQueues.get(channel);
+        for (int i = 0; i < queue.size(); i++) {
+            queue.add(value);
+        }
+    }
+
+    protected final double readAdcChannel(int channel, int samples) {
+        return readAdcChannel(channel, samples, x -> x);
+    }
+
+    protected final double readAdcChannel(int channel, int samples, Function<Double, Double> map) {
+        double sum = 0;
+        var values = adcQueues.get(channel).stream().toList();
+        for (int i = 1; i <= samples; i++) {
+            sum += map.apply(values.get(values.size() - i));
+        }
+        return sum / samples;
+    }
+
+    @Override
+    public void initialize() {
+        super.initialize();
+        measuredVoltage = circuit.outputVoltage.get();
+    }
 }

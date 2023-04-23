@@ -34,8 +34,14 @@ namespace ControlMain
     void (*controlHandler)() = dummyControlHandler;
     void (*mainHandler)() = dummyMainHandler;
 
+    uint blobMessageIndex;
+    volatile bool blobTriggered = false;
+    volatile bool blobFull = false;
+    MessageBuffer<BlobMessage> blobMessage(MessageType::BlobMessage);
+
     void reset()
     {
+        blobTriggered = false;
         HAL_ADC_Stop_DMA(&hadc1);
         HAL_TIM_Base_Stop(&htim1);
         HAL_TIM_Base_Stop(&htim9);
@@ -117,6 +123,29 @@ namespace ControlMain
 namespace PWMMode
 {
     uint32_t lastStatusSend = 0;
+
+    void control()
+    {
+        if (ControlMain::blobTriggered && !ControlMain::blobFull)
+        {
+            uint16_t adcValues[ControlMain::adcChannelCount];
+            ControlMain::readADCValues(1, adcValues);
+            auto adc = adcValues[0];
+
+            uint &idx = ControlMain::blobMessageIndex;
+            if (idx + 2 <= sizeof(ControlMain::blobMessage.msg))
+            {
+                uint8_t *data = ControlMain::blobMessage.msg.data;
+                data[idx++] = adc;
+                data[idx++] = adc >> 8;
+            }
+            else
+            {
+                ControlMain::blobFull = true;
+            }
+        }
+    }
+
     void main()
     {
         auto now = HAL_GetTick();
@@ -143,7 +172,12 @@ namespace PWMMode
         TIM1->CCR1 = config->compare;
         TIM1->CCR3 = config->adcTrigger;
         TIM1->PSC = config->prescale;
+
+        TIM9->PSC = config->ctrlPrescale;
+        TIM9->ARR = config->ctrlReload;
+
         ControlMain::mainHandler = main;
+        ControlMain::controlHandler = control;
 
         ControlMain::setAdcSampleCycles(config->adcSampleCycles);
         ControlMain::startTimers();
@@ -251,6 +285,25 @@ namespace PidControlMode
         lastError = error;
 
         TIM1->CCR1 = duty * TIM1->ARR;
+
+        if (ControlMain::blobTriggered && !ControlMain::blobFull)
+        {
+            uint &idx = ControlMain::blobMessageIndex;
+            if (idx + 6 <= sizeof(ControlMain::blobMessage.msg))
+            {
+                uint8_t *data = ControlMain::blobMessage.msg.data;
+                data[idx++] = adc;
+                data[idx++] = adc >> 8;
+                data[idx++] = TIM1->CCR1;
+                data[idx++] = TIM1->CCR1 >> 8;
+                data[idx++] = TIM1->CCR1 >> 16;
+                data[idx++] = TIM1->CCR1 >> 24;
+            }
+            else
+            {
+                ControlMain::blobFull = true;
+            }
+        }
     }
 
     void main()
@@ -307,6 +360,7 @@ namespace PidControlMode
         ControlMain::startTimers();
         ControlMain::startStopPWMOutput(config->running);
     }
+
 }
 
 namespace ControlMain
@@ -315,10 +369,17 @@ namespace ControlMain
     uint8_t aggregationBuffer[maxMessageSize + 1];
     uint32_t index = 0;
 
-    void handleMessage(uint8_t messageType)
+    void handleMessage(MessageType messageType)
     {
+        if (messageType == MessageType::TriggerBlobMessage)
+        {
+            blobMessageIndex = 0;
+            blobFull = false;
+            blobTriggered = true;
+            return;
+        }
         reset();
-        switch ((MessageType)messageType)
+        switch (messageType)
         {
         case MessageType::PWMModeConfigMessage:
             PWMMode::handle((PWMModeConfigMessage *)(aggregationBuffer + 1));
@@ -329,7 +390,6 @@ namespace ControlMain
         case MessageType::SimpleControlConfigMessage:
             SimpleControlMode::handle((SimpleControlConfigMessage *)(aggregationBuffer + 1));
             break;
-
         default:
             break;
         }
@@ -347,7 +407,7 @@ namespace ControlMain
             memcpy(aggregationBuffer + index, buf + i, remaining);
             index += remaining;
             i += remaining;
-            if (index > 0)
+            while (index > 0)
             {
                 uint8_t messageType = aggregationBuffer[0];
 
@@ -355,12 +415,16 @@ namespace ControlMain
                 if (index >= messageSize + 1)
                 {
                     // complete message is in aggregation buffer
-                    handleMessage(messageType);
+                    handleMessage((MessageType)messageType);
 
                     // shrink aggregation buffer
                     if (index > messageSize + 1)
                         memmove(aggregationBuffer, aggregationBuffer + index, index - (messageSize + 1));
                     index -= messageSize + 1;
+                }
+                else
+                {
+                    break;
                 }
             }
         }
@@ -391,6 +455,13 @@ namespace ControlMain
                 while (CDC_Transmit_FS(buf.bytes(), sizeof(buf)) == USBD_BUSY)
                     ;
             }
+        }
+
+        if (blobTriggered && blobFull)
+        {
+            while (CDC_Transmit_FS(blobMessage.bytes(), sizeof(blobMessage)) == USBD_BUSY)
+                ;
+            blobTriggered = false;
         }
     }
 }

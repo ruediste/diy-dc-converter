@@ -57,21 +57,21 @@ Notice the reduced duty cycle to compensate for the increased load resistance (l
 
 The following two oscilloscope shots show the shorting and un-shorting one of the load resistors. Notice that the voltage fluctuates between 6V and 10V, and takes about 0.2 seconds to stabilize. For the output capacitor I used a 10uF capacitor, which is quite small.
 
-![](loadChangeRiseSlow.bmp)
+![](loadChangeRiseSlow.png)
 
-![](loadChangeLowerSlow.bmp)
+![](loadChangeLowerSlow.png)
 
 
 Of course, we can improve by increasing the `Duty Change Step` to 0.02:
 
-![](LoadChangeLowerFaster.bmp)
+![](LoadChangeLowerFaster.png)
 
 Now our settle time is reduced to 0.1s. Pushing this even further with a `Duty Change Step` of 0.2:
 
-![](loadChangeLower02.bmp)
+![](loadChangeLower02.png)
 
 Now the settle time has been reduced to about 14ms (time scale of the scope changed), or 0.014s. But notice the small oscillations after settling! If we increase the step size to 4:
 
-![](loadChangeLower4.bmp)
+![](loadChangeLower4.png)
 
 Now we clearly get some oscillations. This shows a typical tradeoff for control loops: As the feedback gets faster, the regulation becomes snappier, but after a certain point we run into oscillations.

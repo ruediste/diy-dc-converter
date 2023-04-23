@@ -83,26 +83,17 @@ public class App {
                 persistence.settings.put(mode.name, settings);
                 persistence.commit();
                 if (autoSend.isSelected()) {
-                    send();
+                    sendConfigMessage();
                 }
             }));
             modeContainer.revalidate();
             modeContainer.repaint();
         }
 
-        public void send() {
+        public void sendConfigMessage() {
             var msg = instance.toConfigMessage(settings);
             System.out.println("Send " + msg);
-            openSerialConnection();
-            var baos = new ByteArrayOutputStream();
-            interfaceSerializer.serialize(msg, baos);
-            try {
-                con.sendBytes(baos.toByteArray());
-            } catch (Exception e) {
-                closeSerialConnection();
-                openSerialConnection();
-                con.sendBytes(baos.toByteArray());
-            }
+            sendMessage(msg);
         }
 
         public void handle(Object msg) {
@@ -130,6 +121,19 @@ public class App {
         con = null;
     }
 
+    public void sendMessage(InterfaceMessage msg) {
+        openSerialConnection();
+        var baos = new ByteArrayOutputStream();
+        interfaceSerializer.serialize(msg, baos);
+        try {
+            con.sendBytes(baos.toByteArray());
+        } catch (Exception e) {
+            closeSerialConnection();
+            openSerialConnection();
+            con.sendBytes(baos.toByteArray());
+        }
+    }
+
     private void openSerialConnection() {
         if (con != null)
             return;
@@ -145,6 +149,7 @@ public class App {
                 } else if (msg instanceof SystemStatusMessage status) {
                     systemStatusLabel.setText("ADC0: " + status.adcValues[0] + " ADC1: " + status.adcValues[1]
                             + "CPU: %.2f%%".formatted(status.controlCpuUsageFraction * 100));
+
                 } else
                     modeInstanceController.handle(msg);
             });
@@ -177,12 +182,12 @@ public class App {
                 persistence.autoSend.set(autoSend.isSelected());
                 persistence.commit();
                 if (autoSend.isSelected())
-                    modeInstanceController.send();
+                    modeInstanceController.sendConfigMessage();
             });
             topPanel.add(autoSend);
 
             JButton send = new JButton("Send");
-            send.addActionListener(e -> modeInstanceController.send());
+            send.addActionListener(e -> modeInstanceController.sendConfigMessage());
             topPanel.add(send);
 
             // serial connections
@@ -203,6 +208,11 @@ public class App {
                 connectionsComboBox.setModel(new DefaultComboBoxModel<>(
                         serialConnections.stream().map(x -> x.toString()).toArray(l -> new String[l])));
             }));
+
+            // trigger blob
+            JButton triggerBlob = new JButton("Trigger Blob");
+            triggerBlob.addActionListener(e -> sendMessage(new TriggerBlobMessage()));
+            topPanel.add(triggerBlob);
         }
 
         // mode ui

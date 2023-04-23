@@ -46,14 +46,49 @@ Putting the values into the firmware controller and manually causing a load jump
 
 ![](controller.png)
 
-![](loadJumpVoltage.bmp)
+![](loadJumpVoltage.png)
 
 Channel 2 shows the output voltage in DC coupling, while channel 1 shows it with AC coupling, using a higher resolution. The voltage spike of 0.5V is higher than predicted (0.2V), but the settle time of around 5ms matches.
 
-The next picture shows the pwm output on channel 1. We can clearly see the reduction of the duty cycleduring the jump.
+The next picture shows the pwm output on channel 1. We can clearly see the reduction of the duty cycle during the jump.
 
-![](loadJumpDuty.bmp)
+![](loadJumpDuty.png)
 
 And finally a more detailed shot of the waveform (both channels showing the output voltage). I guess the peak after the turn-off of the transistor is due to the internal resistance of the capacitor. I might investigate this further in a later post.
 
-![](detailWaveform.bmp)
+![](detailWaveform.png)
+
+# Improving the Simulation
+We obviously saw some difference between the measurement and the simulation. There are a few things which are off in the simulation: 
+
+1. The simulation reads the output voltage in every cycle, the controller only every 2nd cycle.
+1. There is no noise on the ADC
+1. The small electrolytic cap measures an ESR (equivalent serial resistance) of 8 ohm, the simulation does not have any
+
+Point 1 in quickly fixed by improving the simulator. For point 2 we need to know the noise picked up by the ADC. For that purpose there is the `BlobMessage`. When the controller sends a `TriggerBlobMessage` in the PWM mode, the pwm controller will fill the message with ADC readings and send them back. In addition to parsing and writing the resulting values into a file, the mean and standard deviation is calculated. In my case, the StdDev was 4.48. Using that value, we can add some random noise the the ADC value fed to the controller. Below is the result:
+
+![](simulationWithNoise.png)
+
+The peak voltage jump is now simulated pretty accurately.
+
+I also tried to add the ESR to the simulation, but that did not change the result by much.
+
+# Switching to a low ESR cap
+Replacing the electrolytic capacitor by a ceramic capacitor reduced the ripple and shortened the recovery time:
+
+![](loadJumpLowEsr.png)
+
+Also, the waveform looks as expected now:
+
+![](detailWaveformLowEsr.png)
+
+# A Larger Capacitor
+Finally, let's throw a larger capacitor into the mix. First the simulation with the original parameters: 
+
+![](increasedCap.png)
+![](increasedCapScope.png)
+
+We can clearly see the ringing. After optimizing the parameters:
+
+![](increasedCapOptimized.png)
+![](increasedCapOptimizedScope.png)

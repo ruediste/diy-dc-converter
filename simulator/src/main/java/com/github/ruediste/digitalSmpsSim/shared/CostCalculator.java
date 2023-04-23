@@ -18,8 +18,8 @@ public class CostCalculator extends CircuitElement {
     public double currentCost;
 
     double kError = 1;
-    double kDiff = 1;
-    double kDiffDuty = 100;
+    double kDiff = 0;
+    double kDiffDuty = 1;
     double kMaxError2 = 0;
 
     double alpha = 0.1;

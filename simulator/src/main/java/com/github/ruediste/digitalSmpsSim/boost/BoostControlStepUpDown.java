@@ -38,6 +38,7 @@ public class BoostControlStepUpDown extends ControlBase<BoostCircuit> {
         }
 
         controlTimer.onReload = (instant) -> {
+            double measuredOutputVoltage = readAdcChannel(0, 1);
             if (measuredOutputVoltage < targetVoltage.get(instant))
                 duty += dutyChangeStep;
             else

@@ -60,7 +60,7 @@ public class RealSerialConnection {
 					throw new RuntimeException("read() failed ");
 				}
 				if (m > 0) {
-					log.debug("received {}", hexDump(buffer, 0, m));
+					// log.debug("received {}", hexDump(buffer, 0, m));
 					out.write(buffer, 0, m);
 					out.flush();
 				}

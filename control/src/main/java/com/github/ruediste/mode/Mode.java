@@ -18,6 +18,7 @@ import javax.swing.event.DocumentListener;
 import javax.swing.text.Document;
 import javax.swing.text.JTextComponent;
 
+import com.github.ruediste.InterfaceMessage;
 import com.github.ruediste.Listeners;
 
 public abstract class Mode<TSettings extends Serializable> {
@@ -38,7 +39,7 @@ public abstract class Mode<TSettings extends Serializable> {
 
         public abstract Component initializeImpl(TSettings settings, Runnable onChange);
 
-        public abstract Object toConfigMessage(TSettings settings);
+        public abstract InterfaceMessage toConfigMessage(TSettings settings);
 
         protected JSpinner register(JSpinner spinner, Consumer<Double> setter) {
             return ui.register(spinner, setter);
@@ -96,7 +97,7 @@ public abstract class Mode<TSettings extends Serializable> {
          * 
          * @param text           any text component, such as a {@link JTextField}
          *                       or {@link JTextArea}
-         * @param changeListener a listener to receieve {@link ChangeEvent}s
+         * @param changeListener a listener to receive {@link ChangeEvent}s
          *                       when the text is changed; the source object for the
          *                       events
          *                       will be the text component

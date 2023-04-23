@@ -7,13 +7,22 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSpinner;
 import javax.swing.SpinnerNumberModel;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.awt.GridLayout;
+import java.io.PrintWriter;
 import java.io.Serializable;
 
+import com.github.ruediste.BlobMessage;
 import com.github.ruediste.Datatype;
 import com.github.ruediste.InterfaceMessage;
+import com.google.common.base.Charsets;
+import com.google.common.math.StatsAccumulator;
 
 public class PwmMode extends Mode<PwmMode.Settings> {
+    private final Logger log = LoggerFactory.getLogger(PwmMode.class);
 
     public PwmMode() {
         super("PWM");
@@ -30,6 +39,12 @@ public class PwmMode extends Mode<PwmMode.Settings> {
         public int compare;
 
         @Datatype.uint16
+        public int ctrlReload;
+
+        @Datatype.uint16
+        public int ctrlPrescale;
+
+        @Datatype.uint16
         public int adcTrigger;
 
         public boolean running;
@@ -40,6 +55,9 @@ public class PwmMode extends Mode<PwmMode.Settings> {
     public static class Settings implements Serializable {
         /** in hertz */
         double frequency = 10e3;
+
+        /** in hertz */
+        double frequencyControl = 10e3;
 
         /** 0..1 */
         double duty = 0.1;
@@ -59,10 +77,15 @@ public class PwmMode extends Mode<PwmMode.Settings> {
             @Override
             public Component initializeImpl(Settings settings, Runnable onChange) {
 
-                JPanel main = new JPanel(new GridLayout(6, 2));
+                JPanel main = new JPanel(new GridLayout(0, 2));
                 main.add(new JLabel("Frequency [kHz]"));
                 main.add(register(new JSpinner(new SpinnerNumberModel(settings.frequency / 1e3, 1e-3, 500, 1e-3)),
                         value -> settings.frequency = value * 1e3));
+
+                main.add(new JLabel("Control Frequency [kHz]"));
+                main.add(
+                        register(new JSpinner(new SpinnerNumberModel(settings.frequencyControl / 1e3, 1e-3, 500, 1e-3)),
+                                value -> settings.frequencyControl = value * 1e3));
 
                 main.add(new JLabel("Duty [%]"));
                 main.add(register(new JSpinner(new SpinnerNumberModel(settings.duty * 100, 0, 100, 1)),
@@ -89,13 +112,44 @@ public class PwmMode extends Mode<PwmMode.Settings> {
             }
 
             @Override
-            public Object toConfigMessage(Settings settings) {
+            public void handle(Object msg, Settings settings) {
+                if (msg instanceof BlobMessage blob) {
+                    var stats = new StatsAccumulator();
+                    try (var writer = new PrintWriter("dataPwm.csv", Charsets.UTF_8)) {
+                        writer.println("adc");
+                        for (int i = 0; i + 2 <= blob.data.length;) {
+                            int adc = blob.readUint16(i);
+                            i += 2;
+                            writer.println(adc);
+                            stats.add(adc);
+                        }
+                    } catch (Exception e) {
+                        throw new RuntimeException(e);
+                    }
+                    log.info(
+                            "Blob received. ADC mean: " + stats.mean() + " stdDev: " + stats.sampleStandardDeviation());
+                }
+
+            }
+
+            @Override
+            public InterfaceMessage toConfigMessage(Settings settings) {
                 var msg = new PWMModeConfigMessage();
-                var values = new PwmValuesCalculator().calculate(settings.frequency, settings.duty);
-                msg.prescale = (int) values.prescale;
-                msg.reload = (int) values.reload;
-                msg.compare = (int) values.compare;
-                msg.adcTrigger = (int) (values.reload * settings.adcTriggerDuty);
+                var calc = new PwmValuesCalculator();
+                {
+                    var values = calc.calculate(settings.frequency, settings.duty);
+                    msg.prescale = (int) values.prescale;
+                    msg.reload = (int) values.reload;
+                    msg.compare = (int) values.compare;
+                    msg.adcTrigger = (int) (values.reload * settings.adcTriggerDuty);
+                }
+
+                {
+                    var controlPwm = calc.calculate(settings.frequencyControl, 0);
+                    msg.ctrlReload = (int) controlPwm.reload;
+                    msg.ctrlPrescale = (int) controlPwm.prescale;
+                }
+
                 msg.adcSampleCycles = (byte) settings.adcSampleCycles;
                 msg.running = settings.running;
                 return msg;

@@ -128,7 +128,7 @@ public class SimpleControlMode extends Mode<SimpleControlMode.Settings> {
             }
 
             @Override
-            public Object toConfigMessage(Settings settings) {
+            public InterfaceMessage toConfigMessage(Settings settings) {
                 var calc = new PwmValuesCalculator();
                 var msg = new SimpleControlConfigMessage();
                 {

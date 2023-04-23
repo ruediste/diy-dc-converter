@@ -6,6 +6,7 @@ public class BoostDutyCalculator {
     public double outputVoltage = 10;
     public double outputCurrent = 2;
     public double inductance = 3e-3;
+    public double diodeForwardVoltageDrop = 0.2;
 
     public double switchingPeriod() {
         return 1 / switchingFrequency;
@@ -13,7 +14,7 @@ public class BoostDutyCalculator {
 
     public double inputCurrent() {
         // iIn*vIn=iOut*vOut; iIn=iOut*vOut/vIn
-        return outputCurrent * outputVoltage / inputVoltage;
+        return outputCurrent * (outputVoltage + diodeForwardVoltageDrop) / inputVoltage;
     }
 
     public static class BoostDesignResult {
@@ -24,7 +25,7 @@ public class BoostDutyCalculator {
     public BoostDesignResult calculate() {
         var result = new BoostDesignResult();
         // Vo= Vin/(1-D); 1-D=Vin/Vo; D-1=-Vin/Vo; D=1-Vin/Vo;
-        double ccmDuty = 1 - inputVoltage / outputVoltage;
+        double ccmDuty = 1 - inputVoltage / (outputVoltage + diodeForwardVoltageDrop);
 
         // v=L*di/dt; di=v*dt/L;
         double iRippleCcm = inputVoltage * ccmDuty * switchingPeriod() / inductance;
@@ -49,7 +50,7 @@ public class BoostDutyCalculator {
             // inputCurrent=(duty+dropDuty)*iPeak/2=duty*(k+1)*iPeak/2
             // inputCurrent=duty*(k+1)*vIn*duty*period/(2*L)
             // duty=sqrt(2*L*inputCurrent/((k+1)*vIn*period))
-            var k = inputVoltage / (outputVoltage - inputVoltage);
+            var k = inputVoltage / (outputVoltage + diodeForwardVoltageDrop - inputVoltage);
             result.duty = Math.sqrt(2 * inductance * inputCurrent() / ((k + 1) * inputVoltage * switchingPeriod()));
         }
         return result;
