@@ -18,16 +18,16 @@ public class Simulator {
             if (plot.end != null && time > plot.end)
                 continue;
             for (var series : plot.series) {
-                series.count += stepDuration;
+                series.sumDuration += stepDuration;
                 series.sum += series.valueSupplier.get() * stepDuration;
             }
             if (addPoint) {
                 var values = new Plot.PlotValues();
                 values.time = time;
                 for (var series : plot.series) {
-                    values.values.add(series.sum / series.count);
+                    values.values.add(series.sumDuration > 1e-9 ? series.sum / series.sumDuration : 0);
                     series.sum = 0;
-                    series.count = 0;
+                    series.sumDuration = 0;
                 }
                 plot.values.add(values);
             }

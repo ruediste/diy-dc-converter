@@ -30,6 +30,7 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
     public double controlFrequency = 7e3;
 
     public double lowPass = 4;
+    public double duty;
 
     public int integral;
 
@@ -96,7 +97,6 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
         lastError = error;
 
         pwmChannel.compare = (long) (duty * pwmTimer.reload);
-        circuit.duty.set(duty);
     }
 
     public <T extends PowerCircuitBase> Consumer<T> optimize(List<Supplier<T>> circuitSuppliers) {
@@ -151,10 +151,14 @@ public class BoostControlPID extends ControlBase<BoostCircuit> {
         calc.switchingFrequency = switchingFrequency;
         var result = calc.calculate();
         duty = result.duty;
-        circuit.duty.initialize(duty);
         if (kI != 0)
             integral = (int) (duty / kI);
         circuit.power.iL = result.initialInductorCurrent;
         fillAdcChannel(0, targetVoltage.get(0));
+    }
+
+    @Override
+    public double setPoint() {
+        return duty;
     }
 }

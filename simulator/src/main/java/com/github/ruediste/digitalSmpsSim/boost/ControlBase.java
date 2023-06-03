@@ -13,7 +13,12 @@ import com.google.common.collect.EvictingQueue;
 public abstract class ControlBase<TCircuit extends PowerCircuitBase> extends CircuitElement {
     protected final TCircuit circuit;
 
-    public double duty = 0.5;
+    /**
+     * Used by the {@link com.github.ruediste.digitalSmpsSim.shared.CostCalculator}
+     * to track (and penalty)
+     * setpoint changes.
+     */
+    public abstract double setPoint();
 
     public final HardwareTimer pwmTimer;
     public final HardwareTimer.Channel pwmChannel;
@@ -37,15 +42,19 @@ public abstract class ControlBase<TCircuit extends PowerCircuitBase> extends Cir
                 .withUpdatedValues(
                         () -> {
                             if ((adcIteration % adcQueues.size()) == 0) {
-
                                 double voltage = circuit.outputVoltage.get();
                                 adcQueues.get(0).add(voltage);
                                 measuredVoltage = voltage;
                             }
+                            if ((adcIteration % adcQueues.size()) == 1) {
+                                adcQueues.get(1).add(circuit.inputVoltage.get());
+                            }
                             adcIteration++;
                         }));
         pwmTimer.onReload = (instant) -> {
-            circuit.switchOn.set(true);
+            if (!pwmChannel.getDisableApplied()) {
+                circuit.switchOn.set(true);
+            }
         };
         circuit.switchOn.initialize(true);
 
@@ -72,6 +81,9 @@ public abstract class ControlBase<TCircuit extends PowerCircuitBase> extends Cir
 
     public abstract double eventTime();
 
+    /**
+     * Invoked during construction of the circuit, before initialize()
+     */
     public abstract void initializeSteadyState();
 
     public abstract <T extends PowerCircuitBase> Consumer<T> optimize(List<Supplier<T>> circuitSuppliers);

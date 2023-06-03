@@ -17,7 +17,7 @@ public class BlobMessage implements InterfaceMessage {
         int result = 0;
         for (int i = 1; i >= 0; i--) {
             result <<= 8;
-            result |= ((long) data[idx + i]) & 0xFF;
+            result |= ((int) data[idx + i]) & 0xFF;
         }
         return result;
     }

@@ -7,7 +7,7 @@ public enum Unit {
     Digital("D"),
     Ohm("\u03A9"),
     Farad("F"),
-    Herz("Hz"),
+    Hertz("Hz"),
     Number("1");
 
     public final String symbol;

@@ -19,19 +19,19 @@ public class CostCalculator extends CircuitElement {
 
     double kError = 1;
     double kDiff = 0;
-    double kDiffDuty = 1;
+    double kDiffSetpoint = 2e-5;
     double kMaxError2 = 0;
 
     double alpha = 0.1;
 
     double avgOutputVoltage;
-    double lastDuty;
+    double lastSetpoint;
     double maxError2 = 0;
 
     @Override
     public void postInitialize() {
         avgOutputVoltage = circuit.control.targetValue(0);
-        lastDuty = circuit.duty.get();
+        lastSetpoint = circuit.control.setPoint();
     }
 
     @Override
@@ -50,14 +50,14 @@ public class CostCalculator extends CircuitElement {
             // differentiation
             cost += kDiff * Math.pow(value - avgOutputVoltage, 2);
 
-            // duty diff
-            cost += kDiffDuty * Math.pow(circuit.duty.get() - lastDuty, 2);
+            // setpoint diff
+            cost += kDiffSetpoint * Math.pow(circuit.control.setPoint() - lastSetpoint, 2);
 
             totalCost += cost * stepDuration;
             currentCost = cost;
 
             avgOutputVoltage = value * alpha + (1 - alpha) * avgOutputVoltage;
-            lastDuty = circuit.duty.get();
+            lastSetpoint = circuit.control.setPoint();
 
             nextEvaluation += evaluationPeriod;
         }

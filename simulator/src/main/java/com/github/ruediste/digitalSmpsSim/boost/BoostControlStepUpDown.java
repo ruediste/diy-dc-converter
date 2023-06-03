@@ -16,6 +16,7 @@ public class BoostControlStepUpDown extends ControlBase<BoostCircuit> {
     public double maxDuty = 0.6;
     public double switchingFrequency = 100e3;
     public double controlFrequency = 10e3;
+    public double duty;
 
     protected BoostControlStepUpDown(BoostCircuit circuit) {
         super(circuit);
@@ -50,7 +51,6 @@ public class BoostControlStepUpDown extends ControlBase<BoostCircuit> {
                 duty = maxDuty;
             }
             pwmChannel.compare = (long) duty * pwmTimer.reload;
-            circuit.duty.set(duty);
         };
     }
 
@@ -99,4 +99,8 @@ public class BoostControlStepUpDown extends ControlBase<BoostCircuit> {
                 circuitSuppliers);
     }
 
+    @Override
+    public double setPoint() {
+        return duty;
+    }
 }

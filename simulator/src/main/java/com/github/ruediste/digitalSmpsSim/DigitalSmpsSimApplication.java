@@ -5,9 +5,9 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.SwingConstants;
 import java.awt.BorderLayout;
-import java.awt.GridLayout;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.util.stream.Collectors;
 
 import org.knowm.xchart.XChartPanel;
@@ -16,8 +16,12 @@ import org.knowm.xchart.XYChartBuilder;
 import org.knowm.xchart.XYSeries;
 import org.knowm.xchart.internal.series.Series.DataType;
 import org.knowm.xchart.style.Styler.LegendPosition;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class DigitalSmpsSimApplication {
+
+	static Logger log = LoggerFactory.getLogger((DigitalSmpsSimApplication.class));
 
 	public static void main(String[] args) {
 		var simulations = new Simulations();
@@ -35,7 +39,7 @@ public class DigitalSmpsSimApplication {
 
 			for (var plot : circuit.plots) {
 				// Create Chart
-				final XYChart chart = new XYChartBuilder().width(800).height(400).title(plot.title)
+				final XYChart chart = new XYChartBuilder().height(400).title(plot.title)
 						.xAxisTitle("Time [" + plot.timePrefix.symbol + "s]")
 						.build();
 				// Customize Chart
@@ -85,14 +89,15 @@ public class DigitalSmpsSimApplication {
 
 				// var plotsPanel = new PlotsPanel();
 
-				var plotsPanel = new JPanel(new GridLayout(0, 3));
+				// var plotsLayout = new GridLayout(0, 1);
+				var plotsPanel = new JPanel();
+				plotsPanel.setLayout(new BoxLayout(plotsPanel, BoxLayout.PAGE_AXIS));
+				circuits.forEach(plotsPanel::add);
+
 				JScrollPane scrollPane = new JScrollPane(plotsPanel);
 				scrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 				scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-
 				frame.add(scrollPane, BorderLayout.CENTER);
-
-				circuits.forEach(plotsPanel::add);
 
 				// label
 				// JLabel label = new JLabel("Blah blah blah.", SwingConstants.CENTER);

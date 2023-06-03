@@ -8,7 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.github.ruediste.digitalSmpsSim.boost.BoostCircuit;
-import com.github.ruediste.digitalSmpsSim.boost.BoostControlPID;
+import com.github.ruediste.digitalSmpsSim.boost.BoostControlCombined;
+import com.github.ruediste.digitalSmpsSim.boost.BoostControlCombined.Mode;
 import com.github.ruediste.digitalSmpsSim.quantity.SiPrefix;
 import com.github.ruediste.digitalSmpsSim.quantity.Unit;
 import com.github.ruediste.digitalSmpsSim.shared.PowerCircuitBase;
@@ -24,7 +25,8 @@ public class Simulations {
     public enum CircuitParameterAxis {
         EVENT,
         V_OUT,
-        I_OUT
+        I_OUT,
+        LOAD_DROP
     }
 
     public record CircuitParameterValue(
@@ -33,6 +35,7 @@ public class Simulations {
     };
 
     private enum Event {
+        NONE,
         INPUT_DROP,
         LOAD_DROP,
         SETPOINT_CHANGE,
@@ -48,7 +51,7 @@ public class Simulations {
         var sim = new Simulator();
 
         var circuitSuppliers = createCircuits();
-        switch (Variant.MANUAL) {
+        switch (Variant.OPTIMIZE_ALL) {
             case MANUAL: {
                 var first = true;
                 for (var circuitSupplier : circuitSuppliers) {
@@ -106,70 +109,82 @@ public class Simulations {
         // design.outputRipple = Voltage.of(0.1);
 
         double vIn = 5;
-        List<Double> vOuts = List.of(8.);
-        List<Double> iOuts = List.of(8. / 500.);
+        List<Double> vOuts = List.of(12.);
+        List<Double> iOuts = List.of(10e-3);
+        List<Double> loadDrops = List.of(0.8, 2., 5., 10., 100.);
         // List<Double> vOuts = List.of(7., 10., 20., 30.);
         // List<Double> iOuts = List.of(0.01, 0.1, 1., 2.);
 
         for (var event : Event.values()) {
             for (var vOut : vOuts)
-                for (var iOut : iOuts) {
-                    // if (iOut.value() >= 1.)
-                    // continue;
-                    // if (event != Event.INPUT_DROP || vOut.value() != 10 || iOut.value() != 1)
-                    // continue;
-                    if (event != Event.LOAD_DROP)
-                        continue;
-                    result.add(() -> {
-                        // var circuit = design.circuit();
-                        var circuit = new BoostCircuit();
-                        var control = new BoostControlPID(circuit);
-                        circuit.control = control;
+                for (var loadDrop : event == Event.LOAD_DROP ? loadDrops : List.of(1.))
+                    for (var iOut : iOuts) {
+                        // if (iOut.value() >= 1.)
+                        // continue;
+                        // if (event != Event.LOAD_DROP)
+                        // continue;
+                        if (event != Event.LOAD_DROP && event != Event.NONE)
+                            continue;
+                        result.add(() -> {
+                            // var circuit = design.circuit();
+                            var circuit = new BoostCircuit();
+                            var control = new BoostControlCombined(circuit);
+                            circuit.control = control;
 
-                        circuit.addParameterValue(CircuitParameterAxis.EVENT, event.toString());
-                        circuit.addParameterValue(CircuitParameterAxis.V_OUT, SiPrefix.format(vOut, "V"));
-                        circuit.addParameterValue(CircuitParameterAxis.I_OUT, SiPrefix.format(iOut, "A"));
+                            circuit.addParameterValue(CircuitParameterAxis.EVENT, event.toString());
+                            circuit.addParameterValue(CircuitParameterAxis.V_OUT, SiPrefix.format(vOut, "V"));
+                            circuit.addParameterValue(CircuitParameterAxis.I_OUT, SiPrefix.format(iOut, "A"));
+                            if (event == Event.LOAD_DROP) {
+                                circuit.addParameterValue(CircuitParameterAxis.LOAD_DROP, "" + loadDrop);
 
-                        circuit.source.voltage.set(0, vIn);
-                        circuit.load.resistance.set(0, vOut / iOut);
-                        circuit.outputVoltage.initialize(vOut);
-                        control.targetVoltage.set(0, vOut);
+                            }
 
-                        control.initializeSteadyState();
+                            circuit.source.voltage.set(0, vIn);
+                            circuit.load.resistance.set(0, vOut / iOut);
+                            circuit.outputVoltage.initialize(vOut);
+                            control.targetVoltage.set(0, vOut);
 
-                        double eventTime = circuit.control.eventTime();
+                            control.initializeSteadyState();
 
-                        new Plot(circuit, vOut + " - " + iOut)
-                                .add("Vout", Unit.Volt, circuit.outputVoltage)
-                                // .add("IL", Unit.Ampere, circuit.inductorCurrent)
-                                .add("Duty", Unit.Number, circuit.duty)
-                        // .add("sw", Unit.Number, () -> (Double) (circuit.switchOn.get() ? 1. : 0.))
-                        // .add("int", Unit.Number, () -> (double) control.integral)
-                        // .add("Vm", Unit.Number, () -> (double) control.measuredVoltage)
-                        // .add("Error", circuit.control.errorOut)
-                        // .add("Cost", Unit.Number, () -> circuit.costCalculator.currentCost)
-                        // .add("tCost", Unit.Number, () -> circuit.costCalculator.totalCost)
-                        //
-                        ;
-                        switch (event) {
-                            case INPUT_DROP:
-                                circuit.source.voltage.set(eventTime, vIn - 1);
-                                break;
-                            case LOAD_DROP:
-                                circuit.load.resistance.set(eventTime,
-                                        circuit.load.resistance.get(0) * 2);
-                                break;
-                            case SETPOINT_CHANGE:
-                                control.targetVoltage.set(eventTime, vOut * 0.8);
-                                break;
-                            default:
-                                break;
+                            double eventTime = circuit.control.eventTime();
 
-                        }
-                        return circuit;
-                    });
+                            new Plot(circuit, vOut + " - " + iOut)
+                                    .add("Vout", Unit.Volt, circuit.outputVoltage)
+                                    // .add("IL", Unit.Ampere, circuit.inductorCurrent)
+                                    // .add("Error", Unit.Number, () -> (double) control.error)
+                                    .add("Mode", Unit.Number, () -> control.mode == Mode.CYCLE_SKIPPING ? 0. : 1.)
+                                    // .add("Diff", Unit.Number, () -> (double) control.diff)
+                                    .add("Frequency", Unit.Hertz, () -> (double) control.frequency)
+                                    // .add("Duty", Unit.Number, circuit.duty)
+                                    // .add("sw", Unit.Number, () -> (Double) (circuit.switchOn.get() ? 1. : 0.))
+                                    .add("PWM Enabled", Unit.Number,
+                                            () -> (Double) (control.pwmChannel.disable ? 0. : 1.))
+                            // .add("int", Unit.Number, () -> (double) control.integral)
+                            // .add("Vm", Unit.Number, () -> (double) control.measuredVoltage)
+                            // .add("Error", circuit.control.errorOut)
+                            // .add("Cost", Unit.Number, () -> circuit.costCalculator.currentCost)
+                            // .add("tCost", Unit.Number, () -> circuit.costCalculator.totalCost)
+                            //
+                            ;
+                            switch (event) {
+                                case INPUT_DROP:
+                                    circuit.source.voltage.set(eventTime, vIn - 1);
+                                    break;
+                                case LOAD_DROP:
+                                    circuit.load.resistance.set(eventTime,
+                                            circuit.load.resistance.get(0) * loadDrop);
+                                    break;
+                                case SETPOINT_CHANGE:
+                                    control.targetVoltage.set(eventTime, vOut * 0.8);
+                                    break;
+                                default:
+                                    break;
 
-                }
+                            }
+                            return circuit;
+                        });
+
+                    }
         }
 
         return result;

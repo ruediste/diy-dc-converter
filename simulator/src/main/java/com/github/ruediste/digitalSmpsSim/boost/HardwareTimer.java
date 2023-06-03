@@ -29,6 +29,13 @@ public class HardwareTimer extends CircuitElement {
 
         private double nextCompareMatchInstant;
         private boolean matched;
+
+        public boolean disable;
+        private boolean disableApplied;
+
+        public boolean getDisableApplied() {
+            return disableApplied;
+        }
     }
 
     private List<Channel> channels = new ArrayList<>();
@@ -39,6 +46,7 @@ public class HardwareTimer extends CircuitElement {
         var clockPeriod = (prescale + 1) * 1 / clockFrequency;
         nextCycleStart = lastCycleStart + clockPeriod * reload;
         for (var channel : channels) {
+            channel.disableApplied = channel.disable;
             channel.nextCompareMatchInstant = lastCycleStart + clockPeriod * channel.compare;
             channel.matched = false;
         }
@@ -67,16 +75,16 @@ public class HardwareTimer extends CircuitElement {
     @Override
     public void run(double stepStart, double stepEnd, double stepDuration) {
         for (var channel : channels) {
-            if (!channel.matched && stepEnd >= channel.nextCompareMatchInstant) {
+            if (!channel.matched && stepEnd >= channel.nextCompareMatchInstant && !channel.disableApplied) {
                 channel.onCompare.run(stepEnd);
                 channel.matched = true;
             }
         }
         if (stepEnd >= nextCycleStart) {
-            if (onReload != null)
-                onReload.run(stepEnd);
             lastCycleStart = nextCycleStart;
             updateInstants();
+            if (onReload != null)
+                onReload.run(stepEnd);
         }
     }
 

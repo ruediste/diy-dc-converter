@@ -38,7 +38,7 @@ public class Plot {
         public int yAxisIndex;
 
         public double sum;
-        public double count;
+        public double sumDuration;
 
         public Series(String name, Unit unit, Supplier<Double> valueSupplier) {
             this.name = name;
