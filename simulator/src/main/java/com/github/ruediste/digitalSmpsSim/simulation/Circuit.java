@@ -30,7 +30,7 @@ public class Circuit {
         this.withUpdatedValues.add(run);
     }
 
-    public void addParameterValue(CircuitParameterAxis axis, String label) {
-        this.parameterValues.add(new CircuitParameterValue(axis, label));
+    public void addParameterValue(CircuitParameterAxis axis, Object value, String label) {
+        this.parameterValues.add(new CircuitParameterValue(axis, value, label));
     }
 }

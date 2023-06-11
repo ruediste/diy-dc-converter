@@ -67,7 +67,8 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
 
     public Mode mode;
     double lastError;
-    int pwmEnabledCycles;
+    double pwmEnabledCycles;
+    double underFrequencyCycles;
     public int error;
     public double diff;
     public double errorS;
@@ -79,21 +80,29 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
 
         // v=L*di/dt; t=L*iPeak/vIn
         double onTime = circuit.power.inductance * peakCurrent / adcToVoltage(vIn);
+        double minOffTime = circuit.power.inductance * peakCurrent / (adcToVoltage(vOut) - adcToVoltage(vIn)) * 1.1;
+        double maxFrequency = 1 / (onTime + minOffTime);
+
         error = (voltageToAdc(targetVoltage.get(instant)) - vOut);
 
         switch (mode) {
             case COT: {
                 errorS = alphaLast * alphaFactor * error + (1 - alphaLast * alphaFactor) * errorS;
-                if (kI != 0) {
-                    integral += kI * error;
-                }
+                integral += kI * errorS;
+                integral = Math.max(Math.min(integral, maxFrequency), 0);
 
                 diff = errorS - lastError;
 
-                frequency = error * kP + integral + diff * kD;
-                frequency = Math.min(frequency, 15e3);
+                frequency = errorS * kP + integral + diff * kD;
+                frequency = Math.min(frequency, maxFrequency);
 
                 if (frequency < minimumSwitchingFrequency) {
+                    underFrequencyCycles += minimumSwitchingFrequency / controlFrequency;
+                    frequency = minimumSwitchingFrequency;
+                } else {
+                    underFrequencyCycles = 0;
+                }
+                if (underFrequencyCycles > 3) {
                     mode = Mode.CYCLE_SKIPPING;
                     pwmChannel.disable = true;
                     pwmEnabledCycles = 0;
@@ -125,12 +134,13 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
                     pwmEnabledCycles = 0;
                 } else {
                     pwmChannel.disable = false;
-                    pwmEnabledCycles++;
-                    if (pwmEnabledCycles > 50) {
+                    pwmEnabledCycles += frequency / controlFrequency;
+                    if (pwmEnabledCycles > 3) {
                         mode = Mode.COT;
                         integral = frequency;
                         errorS = error;
                         lastError = error;
+                        underFrequencyCycles = 0;
                     }
                 }
 
@@ -152,7 +162,7 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
 
                         new Optimizer.OptimizationParameter<BoostControlCombined>("aL", Math.log(alphaLast), 2, -10, 0,
                                 (c, v) -> c.alphaLast = Math.exp(v)),
-                        new Optimizer.OptimizationParameter<BoostControlCombined>("aF", Math.log(alphaFactor), 2, -5, 5,
+                        new Optimizer.OptimizationParameter<BoostControlCombined>("aF", Math.log(alphaFactor), 2, 0, 5,
                                 (c, v) -> c.alphaFactor = Math.exp(v))
 
                 ),

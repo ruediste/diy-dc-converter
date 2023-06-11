@@ -32,7 +32,6 @@ public class Plot {
     public static class Series {
         public String name;
         public Unit unit;
-        public String unitSymbol;
         public Supplier<Double> valueSupplier;
         public boolean stepAfter;
         public int yAxisIndex;
@@ -103,6 +102,7 @@ public class Plot {
             var axisByUnit = axes.stream().collect(Collectors.toMap(x -> x.unit, x -> x));
             for (var s : series) {
                 s.yAxisIndex = axisByUnit.get(s.unit).index;
+                s.name += "[" + s.unit.symbol + "]";
             }
         } else {
             for (int i = 0; i < series.size(); i++) {
@@ -118,9 +118,6 @@ public class Plot {
 
         axes.stream().skip(axes.size() / 2).forEach(a -> a.isRight = true);
 
-        series.forEach(s -> {
-            s.unitSymbol = s.unit.symbol;
-        });
         if (!values.isEmpty()) {
             if (start == null) {
                 start = values.get(0).time;
