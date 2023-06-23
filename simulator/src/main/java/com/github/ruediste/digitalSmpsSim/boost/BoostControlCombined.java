@@ -18,19 +18,21 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
 
     public StepChangingValue<Double> targetVoltage = new StepChangingValue<>();
 
-    public double kP = 5e0;
-    public double kI = 5e0;
-    public double kD = 3e2;
+    public double kP = 1e-04;
+    public double kI = 2e-06;
+    public double kD = 2e-05;
 
     public double alphaLast = 0.01;
     public double alphaFactor = 10;
 
-    public double minimumSwitchingFrequency = 1e3;
-    public double controlFrequency = 20e3;
+    public double cycleSkippingFrequencyFactor = 3;
+    public double controlFrequency = 5e3;
     public double peakCurrent = 60e-3;
+    public double idleFraction = 0.1;
 
     public double integral;
     public double frequency;
+    public double outputCurrentOrig;
 
     private Random random = new Random(0);
 
@@ -65,6 +67,10 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
         CYCLE_SKIPPING
     }
 
+    private double cotLimitTime() {
+        return 1 / (controlFrequency / 2);
+    }
+
     public Mode mode;
     double lastError;
     double pwmEnabledCycles;
@@ -73,6 +79,8 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
     public double diff;
     public double errorS;
 
+    public double minTime;
+
     private void control(double instant) {
 
         int vOut = (int) readAdcChannel(0, 1, x -> random.nextGaussian(voltageToAdc(x), 4.48));
@@ -80,37 +88,52 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
 
         // v=L*di/dt; t=L*iPeak/vIn
         double onTime = circuit.power.inductance * peakCurrent / adcToVoltage(vIn);
-        double minOffTime = circuit.power.inductance * peakCurrent / (adcToVoltage(vOut) - adcToVoltage(vIn)) * 1.1;
-        double maxFrequency = 1 / (onTime + minOffTime);
+        double fallTime = circuit.power.inductance * peakCurrent / (adcToVoltage(vOut) - adcToVoltage(vIn));
+        minTime = (onTime + fallTime) / (1 - idleFraction);
+        double iOutMax = peakCurrent * fallTime / (2 * minTime);
+
+        double iCotLimit = peakCurrent * fallTime / (2 * cotLimitTime());
 
         error = (voltageToAdc(targetVoltage.get(instant)) - vOut);
+
+        if (cotLimitTime() < minTime) {
+            mode = Mode.CYCLE_SKIPPING;
+        }
 
         switch (mode) {
             case COT: {
                 errorS = alphaLast * alphaFactor * error + (1 - alphaLast * alphaFactor) * errorS;
                 integral += kI * errorS;
-                integral = Math.max(Math.min(integral, maxFrequency), 0);
-
                 diff = errorS - lastError;
 
-                frequency = errorS * kP + integral + diff * kD;
-                frequency = Math.min(frequency, maxFrequency);
+                double outputCurrent = errorS * kP + integral + diff * kD;
+                outputCurrentOrig = outputCurrent;
 
-                if (frequency < minimumSwitchingFrequency) {
-                    underFrequencyCycles += minimumSwitchingFrequency / controlFrequency;
-                    frequency = minimumSwitchingFrequency;
+                // limit integral
+                integral = Math.max(Math.min(integral, iOutMax), iCotLimit);
+
+                // limit output current
+                if (outputCurrent > iOutMax) {
+                    // we are in over current mode
+                    outputCurrent = iOutMax;
+                }
+                if (outputCurrent < iCotLimit) {
+                    // we are below the switching current
+                    underFrequencyCycles++;
+                    outputCurrent = iCotLimit;
                 } else {
                     underFrequencyCycles = 0;
                 }
-                if (underFrequencyCycles > 3) {
+
+                double cycleTime = peakCurrent * fallTime / (2 * outputCurrent);
+                frequency = 1 / cycleTime;
+                if (underFrequencyCycles > 0) {
                     mode = Mode.CYCLE_SKIPPING;
                     pwmChannel.disable = true;
                     pwmEnabledCycles = 0;
                 } else {
-                    double period = 1 / frequency;
                     var calc = new PwmValuesCalculator();
-
-                    var values = calc.calculate(frequency, onTime / period);
+                    var values = calc.calculate(frequency, onTime / cycleTime);
                     pwmTimer.prescale = values.prescale;
                     pwmTimer.reload = values.reload;
                     pwmChannel.compare = values.compare;
@@ -120,8 +143,8 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
             }
                 break;
             case CYCLE_SKIPPING: {
-                frequency = minimumSwitchingFrequency * 3;
-                double period = 1 / frequency;
+                double period = cotLimitTime() / 2;
+                frequency = 1 / period;
                 var calc = new PwmValuesCalculator();
 
                 var values = calc.calculate(frequency, onTime / period);
@@ -134,10 +157,10 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
                     pwmEnabledCycles = 0;
                 } else {
                     pwmChannel.disable = false;
-                    pwmEnabledCycles += frequency / controlFrequency;
+                    pwmEnabledCycles++;
                     if (pwmEnabledCycles > 3) {
                         mode = Mode.COT;
-                        integral = frequency;
+                        integral = iCotLimit;
                         errorS = error;
                         lastError = error;
                         underFrequencyCycles = 0;
@@ -202,24 +225,24 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
         var outputVoltage = targetVoltage.get(0);
         var chargeTime = circuit.power.inductance * peakCurrent / inputVoltage;
         var dischargeTime = circuit.power.inductance * peakCurrent / (outputVoltage - inputVoltage);
-        var outputPower = outputVoltage * circuit.load.calculateCurrent(outputVoltage, 0);
-        var boundaryInputPower = inputVoltage * peakCurrent / 2; // conductor constantly charges and discharges,
-                                                                 // constantly using power from the input
+        var outputCurrent = circuit.load.calculateCurrent(outputVoltage, 0);
+        // var outputPower = outputVoltage * outputCurrent;
+        var minCycleTime = (chargeTime + dischargeTime) / (1 - idleFraction);
+        var maxOutputCurrent = peakCurrent * dischargeTime / (2 * minCycleTime);
 
-        if (outputPower > boundaryInputPower) {
-            throw new RuntimeException("CCM Mode not yet implemented");
-        } else {
-            // (chargeTime+dischargeTime)*boundaryInputPower=outputPower*period
-            var period = (chargeTime + dischargeTime) * boundaryInputPower / outputPower;
-            var frequency = 1 / period;
-            if (frequency < minimumSwitchingFrequency) {
+        // limit the output power
+        outputCurrent = Math.min(outputCurrent, maxOutputCurrent);
+
+        {
+            var period = peakCurrent * dischargeTime / (2 * outputCurrent);
+            if (period > cotLimitTime()) {
                 // cycle skipping
                 mode = Mode.CYCLE_SKIPPING;
                 pwmChannel.disable = true;
             } else {
                 // COT
                 mode = Mode.COT;
-                integral = frequency;
+                integral = outputCurrent;
             }
         }
 

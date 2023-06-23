@@ -9,9 +9,6 @@ import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 
 import java.awt.BorderLayout;
-import java.awt.EventQueue;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;

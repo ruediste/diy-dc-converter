@@ -1,11 +1,14 @@
 {
-    "cSpell.words": [
-        "datasheet",
-        "Lpeak",
-        "microcontroller",
-        "microcontrollers",
-        "mosfet",
-        "neglectable",
-        "platformio"
-    ]
+  "[markdown]": {
+    "editor.formatOnSave": false
+  },
+  "cSpell.words": [
+    "datasheet",
+    "Lpeak",
+    "microcontroller",
+    "microcontrollers",
+    "mosfet",
+    "neglectable",
+    "platformio"
+  ]
 }

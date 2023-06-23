@@ -4,11 +4,13 @@ import './index.scss';
 import App from './App';
 import { FirstConverter } from './FirstConverter';
 import { AdcCalculator } from './AdcCalculator';
+import { Cot } from './Cot';
 
 const tools: { [key: string]: () => JSX.Element } = {
   app: () => <App />,
   first: () => <FirstConverter />,
   adcCalculator: () => <AdcCalculator />,
+  cot: () => <Cot />
 };
 
 function DevSelector() {

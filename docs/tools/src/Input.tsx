@@ -26,6 +26,7 @@ interface UnitInfo {
     factor: number
 }
 
+export type UnitInfos = { [key: string]: UnitInfo };
 type StateAccess<T> = [T, Dispatch<SetStateAction<T>>, () => void];
 
 function lowerCamelToUpperSpace(input: string) {
@@ -85,7 +86,7 @@ export function NumberInput<T, K extends KeyOfType<T, number> & string>({ stateA
     </div>;
 }
 
-export function formatValue(value: number, units: { [key: string]: UnitInfo }) {
+export function chooseUnitInfo(value: number, units: { [key: string]: UnitInfo }) {
     const sortedInfos = Object.values(units).sort((a, b) => b.factor - a.factor);
     let chosenInfo = sortedInfos[sortedInfos.length - 1];
     for (const info of sortedInfos) {
@@ -94,8 +95,17 @@ export function formatValue(value: number, units: { [key: string]: UnitInfo }) {
             break;
         }
     }
-    return round(value / chosenInfo.factor, 3) + ' ' + chosenInfo.label;
+    return chosenInfo;
 
+}
+
+export function isUnitInfo(value: any): value is UnitInfo {
+    return 'label' in value && 'factor' in value;
+}
+
+export function formatValue(value: number, units: { [key: string]: UnitInfo } | UnitInfo, includeLabel: boolean = true): string {
+    let chosenInfo = isUnitInfo(units) ? units : chooseUnitInfo(value, units);
+    return round(value / chosenInfo.factor, 3) + (includeLabel ? ' ' + chosenInfo.label : '');
 }
 
 export const resistanceUnits = {

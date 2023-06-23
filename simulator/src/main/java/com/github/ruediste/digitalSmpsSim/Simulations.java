@@ -110,9 +110,9 @@ public class Simulations {
         // design.outputRipple = Voltage.of(0.1);
 
         double vIn = 5;
-        List<Double> vOuts = List.of(12.);
-        List<Double> iOuts = List.of(0.001, 0.010);
-        List<Double> loadChanges = List.of(10., 1.2, 0.5, 0.2, 0.1, 0.01);
+        List<Double> vOuts = List.of(12., 20.);
+        List<Double> iOuts = List.of(0.010, 0.001);
+        List<Double> loadChanges = List.of(2., 1.2, 0.8, 0.5, 0.2, 0.1);
         // List<Double> vOuts = List.of(7., 10., 20., 30.);
         // List<Double> iOuts = List.of(0.01, 0.1, 1., 2.);
 
@@ -120,8 +120,8 @@ public class Simulations {
             for (var vOut : vOuts)
                 for (var loadChange : event == Event.LOAD_CHANGE ? loadChanges : List.of(1.))
                     for (var iOut : iOuts) {
-                        // if (event != Event.LOAD_CHANGE && event != Event.NONE)
-                        // continue;
+                        if (event != Event.NONE && event != Event.LOAD_CHANGE)
+                            continue;
                         result.add(() -> {
                             // var circuit = design.circuit();
                             var circuit = new BoostCircuit();
@@ -149,18 +149,23 @@ public class Simulations {
                             new Plot(circuit, vOut + " - " + iOut)
                                     .add("Vout", Unit.Volt, circuit.outputVoltage)
                                     // .add("IL", Unit.Ampere, circuit.inductorCurrent)
-                                    // .add("Error", Unit.Number, () -> (double) control.error)
+                                    .add("Error", Unit.Number, () -> (double) control.error).combinedAxis()
+                                    // .add("ErrorS", Unit.Number, () -> (double) control.errorS).combinedAxis()
+                                    .add("Int", Unit.Ampere, () -> (double) control.integral)
+                                    .add("Io", Unit.Ampere, () -> (double) control.outputCurrentOrig)
+
                                     .add("Mode", Unit.Number, () -> control.mode == Mode.CYCLE_SKIPPING ? 0. : 1.)
-                                    // .add("Diff", Unit.Number, () -> (double) control.diff)
-                                    .add("Frequency", Unit.Hertz, () -> (double) control.frequency)
-                                    // .add("Duty", Unit.Number, circuit.duty)
-                                    // .add("sw", Unit.Number, () -> (Double) (circuit.switchOn.get() ? 1. : 0.))
-                                    .add("PWM Enabled", Unit.Number,
-                                            () -> (Double) (control.pwmChannel.disable ? 0. : 1.))
-                                    // .add("int", Unit.Number, () -> (double) control.integral)
-                                    // .add("Vm", Unit.Number, () -> (double) control.measuredVoltage)
-                                    // .add("Error", circuit.control.errorOut)
-                                    .add("Cost", Unit.Number, () -> circuit.costCalculator.currentCost)
+
+                                    .add("MaxFreq", Unit.Hertz, () -> (double) 1 / control.minTime).combinedAxis()
+                                    .add("Frequency", Unit.Hertz, () -> (double) control.frequency).combinedAxis()
+                            // .add("Duty", Unit.Number, circuit.duty)
+                            // .add("sw", Unit.Number, () -> (Double) (circuit.switchOn.get() ? 1. : 0.))
+                            // .add("PWM Enabled", Unit.Number,
+                            // () -> (Double) (control.pwmChannel.disable ? 0. : 1.))
+                            // .add("int", Unit.Number, () -> (double) control.integral)
+                            // .add("Vm", Unit.Number, () -> (double) control.measuredVoltage)
+                            // .add("Error", circuit.control.errorOut)
+                            // .add("Cost", Unit.Number, () -> circuit.costCalculator.currentCost)
                             // .add("tCost", Unit.Number, () -> circuit.costCalculator.totalCost)
                             // .add("cAvgO", Unit.Volt, () -> circuit.costCalculator.avgOutputVoltage)
                             //

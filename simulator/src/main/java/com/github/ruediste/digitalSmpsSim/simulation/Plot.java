@@ -1,7 +1,9 @@
 package com.github.ruediste.digitalSmpsSim.simulation;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -38,6 +40,7 @@ public class Plot {
 
         public double sum;
         public double sumDuration;
+        public boolean combinedAxis;
 
         public Series(String name, Unit unit, Supplier<Double> valueSupplier) {
             this.name = name;
@@ -64,6 +67,11 @@ public class Plot {
         this.series.add(new Series(name, unit, valueSupplier));
         if (unit == Unit.Digital)
             stepAfter();
+        return this;
+    }
+
+    public Plot combinedAxis() {
+        series.get(series.size() - 1).combinedAxis = true;
         return this;
     }
 
@@ -105,14 +113,33 @@ public class Plot {
                 s.name += "[" + s.unit.symbol + "]";
             }
         } else {
-            for (int i = 0; i < series.size(); i++) {
-                var s = series.get(i);
+            int axisIndex = 0;
+            Map<Unit, PlotYAxis> combinedAxes = new HashMap<>();
+            for (var s : series) {
+                if (!s.combinedAxis || combinedAxes.containsKey(s.unit))
+                    continue;
                 var axis = new PlotYAxis();
                 axis.unit = s.unit;
-                axis.unitSymbol = s.name + "[" + s.unit.symbol + "]";
-                axis.index = i;
-                s.yAxisIndex = i;
+                axis.unitSymbol = "[" + s.unit.symbol + "]";
+                axis.index = axisIndex++;
+                combinedAxes.put(s.unit, axis);
                 axes.add(axis);
+            }
+            for (int i = 0; i < series.size(); i++) {
+                var s = series.get(i);
+                PlotYAxis axis;
+                if (s.combinedAxis) {
+                    s.name += "[" + s.unit.symbol + "]";
+                    axis = combinedAxes.get(s.unit);
+                } else {
+                    axis = new PlotYAxis();
+                    axis.unit = s.unit;
+                    axis.unitSymbol = s.name + "[" + s.unit.symbol + "]";
+                    axis.index = axisIndex++;
+                    axes.add(axis);
+                }
+
+                s.yAxisIndex = axis.index;
             }
         }
 
