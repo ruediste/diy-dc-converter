@@ -14,9 +14,9 @@ This issue can be addressed by keeping the on-time of the switch constant and re
 
 $$ t_\text{on}=\frac{L\hat I}{V_\text{in}}$$
 
-The power converted in COT mode is proportional to the frequency. Thus, by changing the PWM frequency we can control the output voltage.
+The power converted in COT mode is proportional to the cycle frequency. Thus, by changing the PWM frequency we can control the output voltage.
 
-If the load drops to a very low level, the frequency becomes also very low. It is not practical to use a PID controller if one period lasts multiple seconds. Therefore, below a minimum load we switch to a mode called cycle skipping. This is essentially a form of hysteric control: The PWM frequency kept fixed. Whenever the voltage drops below the target voltage, the switching PWM signal is enabled. If it rises above the target voltage, the PWM signal is disabled.
+If the load drops to a very low level, the frequency becomes also very low. It is not practical to use a PID controller if one period lasts multiple seconds. Therefore, below a minimum frequency we switch to a mode called cycle skipping. This is essentially a form of hysteric control: The PWM frequency kept fixed. Whenever the voltage drops below the target voltage, the switching PWM signal is enabled. If it rises above the target voltage, the PWM signal is disabled.
 
 # Modes Overview
 
@@ -60,10 +60,7 @@ Using the following tool, you can calculate the performance envelope of a conver
 
 <div data-tool="cot"></div>
 
-The switch from COT to cycle skipping happens as soon as the switching frequency reaches the minimum switching frequency. Choosing that frequency is a bit arbitrary, try 1 per cent of your maximum frequency.
-
-In cycle skipping, the switching frequency is 3 times higher than the minimum frequency. This avoids frequent switching between COT and cycle skipping mode.
-
+The switch from COT to cycle skipping happens as soon as the switching frequency reaches half the control frequency. When we can run a full control cycle for every switching cycle, just switching on the PWM output whenever the output voltage is below the target voltage results in good regulation.
 
 # Cycle Skipping
 

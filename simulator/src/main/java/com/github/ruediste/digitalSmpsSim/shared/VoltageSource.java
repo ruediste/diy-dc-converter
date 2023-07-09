@@ -15,7 +15,6 @@ public class VoltageSource extends CircuitElement {
 
     @Override
     public void initialize() {
-        circuit.inputVoltage.set(voltage.get(0));
     }
 
     @Override

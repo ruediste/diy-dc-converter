@@ -40,6 +40,7 @@ public class Simulations {
         INPUT_DROP,
         LOAD_CHANGE,
         SETPOINT_CHANGE,
+        POWER_ON,
     }
 
     private enum Variant {
@@ -120,7 +121,10 @@ public class Simulations {
             for (var vOut : vOuts)
                 for (var loadChange : event == Event.LOAD_CHANGE ? loadChanges : List.of(1.))
                     for (var iOut : iOuts) {
-                        if (event != Event.NONE && event != Event.LOAD_CHANGE)
+                        if (event != Event.NONE
+                                && event != Event.LOAD_CHANGE
+                        // && event != Event.POWER_ON
+                        )
                             continue;
                         result.add(() -> {
                             // var circuit = design.circuit();
@@ -140,6 +144,7 @@ public class Simulations {
                             circuit.source.voltage.set(0, vIn);
                             circuit.load.resistance.set(0, vOut / iOut);
                             circuit.outputVoltage.initialize(vOut);
+                            circuit.inputVoltage.initialize(vIn);
                             control.targetVoltage.set(0, vOut);
 
                             control.initializeSteadyState();
@@ -149,10 +154,10 @@ public class Simulations {
                             new Plot(circuit, vOut + " - " + iOut)
                                     .add("Vout", Unit.Volt, circuit.outputVoltage)
                                     // .add("IL", Unit.Ampere, circuit.inductorCurrent)
-                                    .add("Error", Unit.Number, () -> (double) control.error).combinedAxis()
+                                    .add("Error", Unit.Number, () -> (double) control.error)// .combinedAxis()
                                     // .add("ErrorS", Unit.Number, () -> (double) control.errorS).combinedAxis()
-                                    .add("Int", Unit.Ampere, () -> (double) control.integral)
-                                    .add("Io", Unit.Ampere, () -> (double) control.outputCurrentOrig)
+                                    // .add("Int", Unit.Ampere, () -> (double) control.integral)
+                                    // .add("Io", Unit.Ampere, () -> (double) control.outputCurrentOrig)
 
                                     .add("Mode", Unit.Number, () -> control.mode == Mode.CYCLE_SKIPPING ? 0. : 1.)
 
@@ -181,6 +186,9 @@ public class Simulations {
                                     break;
                                 case SETPOINT_CHANGE:
                                     control.targetVoltage.set(eventTime, vOut * 1.2);
+                                    break;
+                                case POWER_ON:
+                                    circuit.outputVoltage.initialize(vIn);
                                     break;
                                 default:
                                     break;

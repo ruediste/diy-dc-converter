@@ -8,6 +8,7 @@ import java.util.function.Supplier;
 import com.github.ruediste.digitalSmpsSim.optimization.Optimizer;
 import com.github.ruediste.digitalSmpsSim.shared.PowerCircuitBase;
 import com.github.ruediste.digitalSmpsSim.shared.PwmValuesCalculator;
+import com.github.ruediste.digitalSmpsSim.simulation.ExponentialMovingStatistic;
 import com.github.ruediste.digitalSmpsSim.simulation.StepChangingValue;
 
 public class BoostControlCombined extends ControlBase<BoostCircuit> {
@@ -18,17 +19,20 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
 
     public StepChangingValue<Double> targetVoltage = new StepChangingValue<>();
 
-    public double kP = 1e-04;
-    public double kI = 2e-06;
-    public double kD = 2e-05;
+    public double kP = 7.5e-05;
+    public double kI = 7.8e-05;
+    public double kD = 1.4e-05;
 
-    public double alphaLast = 0.01;
-    public double alphaFactor = 10;
+    public double alphaLast = 1;
+    public double alphaFactor = 1;
+    // public double alphaLast = 0.01;
+    // public double alphaFactor = 10;
 
     public double cycleSkippingFrequencyFactor = 3;
-    public double controlFrequency = 5e3;
+    public double controlFrequency = 10e3;
     public double peakCurrent = 60e-3;
     public double idleFraction = 0.1;
+    public double startupVoltageFactor = 1.1;
 
     public double integral;
     public double frequency;
@@ -67,13 +71,17 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
         CYCLE_SKIPPING
     }
 
-    private double cotLimitTime() {
+    private double calculateCotLimitTime() {
         return 1 / (controlFrequency / 2);
+    }
+
+    private double calculateCurrent(double fallTime, double period) {
+        return peakCurrent * fallTime / (2 * period);
     }
 
     public Mode mode;
     double lastError;
-    double pwmEnabledCycles;
+    double pwmEnabledTime;
     double underFrequencyCycles;
     public int error;
     public double diff;
@@ -81,36 +89,44 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
 
     public double minTime;
 
+    public ExponentialMovingStatistic vOutAdcStats = new ExponentialMovingStatistic(5, 1 / controlFrequency);
+
     private void control(double instant) {
 
-        int vOut = (int) readAdcChannel(0, 1, x -> random.nextGaussian(voltageToAdc(x), 4.48));
-        int vIn = (int) readAdcChannel(1, 1, x -> random.nextGaussian(voltageToAdc(x), 4.48));
+        int vOutAdc = (int) readAdcChannel(0, 1, x -> random.nextGaussian(voltageToAdc(x), 4.48));
+        vOutAdcStats.add(vOutAdc);
+        double vOut = adcToVoltage(vOutAdc);
+        int vInAdc = (int) readAdcChannel(1, 1, x -> random.nextGaussian(voltageToAdc(x), 4.48));
+        double vIn = adcToVoltage(vInAdc);
+        double cotLimitTime = calculateCotLimitTime();
 
         // v=L*di/dt; t=L*iPeak/vIn
-        double onTime = circuit.power.inductance * peakCurrent / adcToVoltage(vIn);
-        double fallTime = circuit.power.inductance * peakCurrent / (adcToVoltage(vOut) - adcToVoltage(vIn));
+        double onTime = circuit.power.inductance * peakCurrent / vIn;
+        double fallTime = circuit.power.inductance * peakCurrent / (Math.max(vOut, vIn * startupVoltageFactor) - vIn);
         minTime = (onTime + fallTime) / (1 - idleFraction);
-        double iOutMax = peakCurrent * fallTime / (2 * minTime);
+        double iOutMax = calculateCurrent(fallTime, minTime);
 
-        double iCotLimit = peakCurrent * fallTime / (2 * cotLimitTime());
+        double iCotLimit = calculateCurrent(fallTime, cotLimitTime);
+        int targetVoltageAdc = voltageToAdc(targetVoltage.get(instant));
 
-        error = (voltageToAdc(targetVoltage.get(instant)) - vOut);
+        error = (targetVoltageAdc - vOutAdc);
 
-        if (cotLimitTime() < minTime) {
+        if (cotLimitTime < minTime) {
             mode = Mode.CYCLE_SKIPPING;
+            pwmEnabledTime = 0;
         }
 
         switch (mode) {
             case COT: {
+                // limit integral
+                integral = Math.max(Math.min(integral, iOutMax), iCotLimit);
+
                 errorS = alphaLast * alphaFactor * error + (1 - alphaLast * alphaFactor) * errorS;
                 integral += kI * errorS;
                 diff = errorS - lastError;
 
                 double outputCurrent = errorS * kP + integral + diff * kD;
                 outputCurrentOrig = outputCurrent;
-
-                // limit integral
-                integral = Math.max(Math.min(integral, iOutMax), iCotLimit);
 
                 // limit output current
                 if (outputCurrent > iOutMax) {
@@ -121,16 +137,18 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
                     // we are below the switching current
                     underFrequencyCycles++;
                     outputCurrent = iCotLimit;
+                    pwmChannel.disable = true;
                 } else {
                     underFrequencyCycles = 0;
+                    pwmChannel.disable = false;
                 }
 
                 double cycleTime = peakCurrent * fallTime / (2 * outputCurrent);
                 frequency = 1 / cycleTime;
-                if (underFrequencyCycles > 0) {
+                if (underFrequencyCycles > 5) {
                     mode = Mode.CYCLE_SKIPPING;
-                    pwmChannel.disable = true;
-                    pwmEnabledCycles = 0;
+                    pwmChannel.disable = false;
+                    pwmEnabledTime = 0;
                 } else {
                     var calc = new PwmValuesCalculator();
                     var values = calc.calculate(frequency, onTime / cycleTime);
@@ -143,7 +161,7 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
             }
                 break;
             case CYCLE_SKIPPING: {
-                double period = cotLimitTime() / 2;
+                double period = Math.max(minTime, cotLimitTime / 2);
                 frequency = 1 / period;
                 var calc = new PwmValuesCalculator();
 
@@ -152,15 +170,15 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
                 pwmTimer.reload = values.reload;
                 pwmChannel.compare = values.compare;
 
-                if (vOut > voltageToAdc(targetVoltage.get(instant))) {
+                if (vOutAdc > targetVoltageAdc) {
                     pwmChannel.disable = true;
-                    pwmEnabledCycles = 0;
+                    pwmEnabledTime = 0;
                 } else {
                     pwmChannel.disable = false;
-                    pwmEnabledCycles++;
-                    if (pwmEnabledCycles > 3) {
+                    pwmEnabledTime += (1 / controlFrequency) / period;
+                    if (pwmEnabledTime > 6 && error * error > 2 * vOutAdcStats.variance) {
                         mode = Mode.COT;
-                        integral = iCotLimit;
+                        integral = calculateCurrent(fallTime, period);
                         errorS = error;
                         lastError = error;
                         underFrequencyCycles = 0;
@@ -181,12 +199,14 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
                         new Optimizer.OptimizationParameter<BoostControlCombined>("kI", Math.log(kD), 2, -15, 10,
                                 (c, v) -> c.kI = Math.exp(v)),
                         new Optimizer.OptimizationParameter<BoostControlCombined>("kD", Math.log(kD), 2, -15, 10,
-                                (c, v) -> c.kD = Math.exp(v)),
+                                (c, v) -> c.kD = Math.exp(v))
 
-                        new Optimizer.OptimizationParameter<BoostControlCombined>("aL", Math.log(alphaLast), 2, -10, 0,
-                                (c, v) -> c.alphaLast = Math.exp(v)),
-                        new Optimizer.OptimizationParameter<BoostControlCombined>("aF", Math.log(alphaFactor), 2, 0, 5,
-                                (c, v) -> c.alphaFactor = Math.exp(v))
+                // new Optimizer.OptimizationParameter<BoostControlCombined>("aL",
+                // Math.log(alphaLast), 2, -10, 0,
+                // (c, v) -> c.alphaLast = Math.exp(v)),
+                // new Optimizer.OptimizationParameter<BoostControlCombined>("aF",
+                // Math.log(alphaFactor), 2, 0, 5,
+                // (c, v) -> c.alphaFactor = Math.exp(v))
 
                 ),
                 circuitSuppliers);
@@ -211,7 +231,7 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
 
     @Override
     public double simulationDuration() {
-        return 800 / controlFrequency;
+        return 400 / controlFrequency;
     }
 
     @Override
@@ -221,21 +241,22 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
 
     @Override
     public void initializeSteadyState() {
-        var inputVoltage = circuit.source.voltage.get(0);
-        var outputVoltage = targetVoltage.get(0);
+        var inputVoltage = circuit.inputVoltage.get();
+        var outputVoltage = Math.max(circuit.outputVoltage.get(), inputVoltage * startupVoltageFactor);
         var chargeTime = circuit.power.inductance * peakCurrent / inputVoltage;
         var dischargeTime = circuit.power.inductance * peakCurrent / (outputVoltage - inputVoltage);
         var outputCurrent = circuit.load.calculateCurrent(outputVoltage, 0);
         // var outputPower = outputVoltage * outputCurrent;
         var minCycleTime = (chargeTime + dischargeTime) / (1 - idleFraction);
         var maxOutputCurrent = peakCurrent * dischargeTime / (2 * minCycleTime);
+        vOutAdcStats.average = voltageToAdc(outputVoltage);
 
         // limit the output power
         outputCurrent = Math.min(outputCurrent, maxOutputCurrent);
 
         {
             var period = peakCurrent * dischargeTime / (2 * outputCurrent);
-            if (period > cotLimitTime()) {
+            if (period > calculateCotLimitTime()) {
                 // cycle skipping
                 mode = Mode.CYCLE_SKIPPING;
                 pwmChannel.disable = true;

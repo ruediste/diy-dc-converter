@@ -13,10 +13,10 @@ public class CostCalculator extends CircuitElement {
     public double totalCost;
     public double currentCost;
 
-    double kError = 1;
+    double kError = 1e0;
     double kErrorSettle = 1e1;
     double kDiff = 0;
-    double kDiffSettle = 0;
+    double kDiffSettle = 1e0;
     double kDiffSetpoint = 0;
     double kDiffSetpointSettle = 0;
     double kMaxError2 = 0;
