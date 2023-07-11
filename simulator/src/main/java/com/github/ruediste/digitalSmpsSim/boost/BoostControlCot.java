@@ -11,9 +11,9 @@ import com.github.ruediste.digitalSmpsSim.shared.PwmValuesCalculator;
 import com.github.ruediste.digitalSmpsSim.simulation.ExponentialMovingStatistic;
 import com.github.ruediste.digitalSmpsSim.simulation.StepChangingValue;
 
-public class BoostControlCombined extends ControlBase<BoostCircuit> {
+public class BoostControlCot extends ControlBase<BoostCircuit> {
 
-    public BoostControlCombined(BoostCircuit circuit) {
+    public BoostControlCot(BoostCircuit circuit) {
         super(circuit);
     }
 
@@ -23,20 +23,13 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
     public double kI = 7.8e-05;
     public double kD = 1.4e-05;
 
-    public double alphaLast = 1;
-    public double alphaFactor = 1;
-    // public double alphaLast = 0.01;
-    // public double alphaFactor = 10;
-
-    public double cycleSkippingFrequencyFactor = 3;
-    public double controlFrequency = 10e3;
+    public double controlFrequency = 5e3;
     public double peakCurrent = 60e-3;
     public double idleFraction = 0.1;
     public double startupVoltageFactor = 1.1;
 
     public double integral;
     public double frequency;
-    public double outputCurrentOrig;
 
     private Random random = new Random(0);
 
@@ -85,11 +78,10 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
     double underFrequencyCycles;
     public int error;
     public double diff;
-    public double errorS;
 
     public double minTime;
 
-    public ExponentialMovingStatistic vOutAdcStats = new ExponentialMovingStatistic(5, 1 / controlFrequency);
+    public ExponentialMovingStatistic vOutAdcStats = new ExponentialMovingStatistic(5, 1);
 
     private void control(double instant) {
 
@@ -121,12 +113,10 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
                 // limit integral
                 integral = Math.max(Math.min(integral, iOutMax), iCotLimit);
 
-                errorS = alphaLast * alphaFactor * error + (1 - alphaLast * alphaFactor) * errorS;
-                integral += kI * errorS;
-                diff = errorS - lastError;
+                integral += kI * error;
+                diff = error - lastError;
 
-                double outputCurrent = errorS * kP + integral + diff * kD;
-                outputCurrentOrig = outputCurrent;
+                double outputCurrent = error * kP + integral + diff * kD;
 
                 // limit output current
                 if (outputCurrent > iOutMax) {
@@ -156,8 +146,6 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
                     pwmTimer.reload = values.reload;
                     pwmChannel.compare = values.compare;
                 }
-
-                lastError = alphaLast * error + (1 - alphaLast) * lastError;
             }
                 break;
             case CYCLE_SKIPPING: {
@@ -179,7 +167,6 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
                     if (pwmEnabledTime > 6 && error * error > 2 * vOutAdcStats.variance) {
                         mode = Mode.COT;
                         integral = calculateCurrent(fallTime, period);
-                        errorS = error;
                         lastError = error;
                         underFrequencyCycles = 0;
                     }
@@ -188,27 +175,19 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
             }
                 break;
         }
+        lastError = error;
     }
 
     public <T extends PowerCircuitBase> Consumer<T> optimize(List<Supplier<T>> circuitSuppliers) {
         var optimizer = new Optimizer();
         return optimizer.optimize(
                 List.of(
-                        new Optimizer.OptimizationParameter<BoostControlCombined>("kP", Math.log(kD), 2, -15, 10,
+                        new Optimizer.OptimizationParameter<BoostControlCot>("kP", Math.log(kD), 2, -15, 10,
                                 (c, v) -> c.kP = Math.exp(v)),
-                        new Optimizer.OptimizationParameter<BoostControlCombined>("kI", Math.log(kD), 2, -15, 10,
+                        new Optimizer.OptimizationParameter<BoostControlCot>("kI", Math.log(kD), 2, -15, 10,
                                 (c, v) -> c.kI = Math.exp(v)),
-                        new Optimizer.OptimizationParameter<BoostControlCombined>("kD", Math.log(kD), 2, -15, 10,
-                                (c, v) -> c.kD = Math.exp(v))
-
-                // new Optimizer.OptimizationParameter<BoostControlCombined>("aL",
-                // Math.log(alphaLast), 2, -10, 0,
-                // (c, v) -> c.alphaLast = Math.exp(v)),
-                // new Optimizer.OptimizationParameter<BoostControlCombined>("aF",
-                // Math.log(alphaFactor), 2, 0, 5,
-                // (c, v) -> c.alphaFactor = Math.exp(v))
-
-                ),
+                        new Optimizer.OptimizationParameter<BoostControlCot>("kD", Math.log(kD), 2, -15, 10,
+                                (c, v) -> c.kD = Math.exp(v))),
                 circuitSuppliers);
     }
 
@@ -219,14 +198,12 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
 
     @Override
     public double actualValue() {
-        // return circuit.outputVoltage.get();
         return measuredVoltage;
     }
 
     @Override
     public String parameterInfo() {
-        return String.format("  kP: %.3e   kI: %.3e   kD: %.3e   aL: %.3e   aF: %.3e", kP, kI, kD, alphaLast,
-                alphaFactor);
+        return String.format("  kP: %.3e   kI: %.3e   kD: %.3e", kP, kI, kD);
     }
 
     @Override
@@ -246,7 +223,6 @@ public class BoostControlCombined extends ControlBase<BoostCircuit> {
         var chargeTime = circuit.power.inductance * peakCurrent / inputVoltage;
         var dischargeTime = circuit.power.inductance * peakCurrent / (outputVoltage - inputVoltage);
         var outputCurrent = circuit.load.calculateCurrent(outputVoltage, 0);
-        // var outputPower = outputVoltage * outputCurrent;
         var minCycleTime = (chargeTime + dischargeTime) / (1 - idleFraction);
         var maxOutputCurrent = peakCurrent * dischargeTime / (2 * minCycleTime);
         vOutAdcStats.average = voltageToAdc(outputVoltage);

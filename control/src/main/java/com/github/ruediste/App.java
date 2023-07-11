@@ -4,6 +4,8 @@ import java.awt.GridLayout;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -144,7 +146,8 @@ public class App {
             SwingUtilities.invokeLater(() -> {
                 if (msg instanceof DebugMessage dbg) {
                     for (int i = 0; i < debugLabels.length; i++) {
-                        debugLabels[i].setText(RealSerialConnection.hexDump(dbg.data, i * 4, 4));
+                        debugLabels[i].setText(RealSerialConnection.hexDump(dbg.data, i * 4, 4) + " asFloat: "
+                                + ByteBuffer.wrap(dbg.data, i * 4, 4).order(ByteOrder.LITTLE_ENDIAN).getFloat());
                     }
                 } else if (msg instanceof SystemStatusMessage status) {
                     systemStatusLabel.setText("ADC0: " + status.adcValues[0] + " ADC1: " + status.adcValues[1]

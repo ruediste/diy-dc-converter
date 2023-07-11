@@ -14,8 +14,8 @@ public class BoostPower extends CircuitElement {
 
     public double iL;
 
-    public double inductance = 3.76e-3 * 0.1;
-    public double capacitance = 100e-6;
+    public double inductance = 3.76e-3;
+    public double capacitance = 10e-6;
     public double diodeForwardVoltageDrop = 0.2;
     public double capacitorVoltage;
     public double capacitorESR = 0.1;

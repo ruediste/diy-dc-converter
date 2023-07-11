@@ -1,12 +1,13 @@
 {
-    "cSpell.words": [
-        "DIER",
-        "hadc",
-        "htim",
-        "JSWSTART",
-        "NDTR",
-        "prescale",
-        "SMPR",
-        "USBD"
-    ]
+  "cSpell.words": [
+    "CCMR",
+    "DIER",
+    "hadc",
+    "htim",
+    "JSWSTART",
+    "NDTR",
+    "prescale",
+    "SMPR",
+    "USBD"
+  ]
 }

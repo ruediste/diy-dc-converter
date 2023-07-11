@@ -8,8 +8,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.github.ruediste.digitalSmpsSim.boost.BoostCircuit;
-import com.github.ruediste.digitalSmpsSim.boost.BoostControlCombined;
-import com.github.ruediste.digitalSmpsSim.boost.BoostControlCombined.Mode;
+import com.github.ruediste.digitalSmpsSim.boost.BoostControlCot;
+import com.github.ruediste.digitalSmpsSim.boost.BoostControlCot.Mode;
 import com.github.ruediste.digitalSmpsSim.quantity.SiPrefix;
 import com.github.ruediste.digitalSmpsSim.quantity.Unit;
 import com.github.ruediste.digitalSmpsSim.shared.PowerCircuitBase;
@@ -129,7 +129,7 @@ public class Simulations {
                         result.add(() -> {
                             // var circuit = design.circuit();
                             var circuit = new BoostCircuit();
-                            var control = new BoostControlCombined(circuit);
+                            var control = new BoostControlCot(circuit);
                             circuit.control = control;
 
                             circuit.addParameterValue(CircuitParameterAxis.EVENT, event, event.toString());

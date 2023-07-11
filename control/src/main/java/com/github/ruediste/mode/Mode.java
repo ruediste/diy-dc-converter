@@ -74,6 +74,10 @@ public abstract class Mode<TSettings extends Serializable> {
             return box;
         }
 
+        public JTextField registerScientificF(float initialValue, Consumer<Float> setter) {
+            return registerScientific(initialValue, x -> setter.accept(x.floatValue()));
+        }
+
         public JTextField registerScientific(double initialValue, Consumer<Double> setter) {
             var field = new JTextField("%.3e".formatted(initialValue));
             addChangeListener(field, e -> {

@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 import com.github.ruediste.digitalSmpsSim.quantity.SiPrefix;
 import com.github.ruediste.digitalSmpsSim.quantity.Unit;
@@ -95,52 +94,34 @@ public class Plot {
     }
 
     public void finish() {
-        if (false) {
-            var units = series.stream().map(x -> x.unit).distinct().sorted().toList();
-            axes = units.stream().map(unit -> {
-                var axis = new PlotYAxis();
-                axis.unit = unit;
-                axis.unitSymbol = unit.symbol;
-                return axis;
-            }).toList();
-            for (int i = 0; i < axes.size(); i++) {
-                var axis = axes.get(i);
-                axis.index = i;
-            }
-            var axisByUnit = axes.stream().collect(Collectors.toMap(x -> x.unit, x -> x));
-            for (var s : series) {
-                s.yAxisIndex = axisByUnit.get(s.unit).index;
+
+        int axisIndex = 0;
+        Map<Unit, PlotYAxis> combinedAxes = new HashMap<>();
+        for (var s : series) {
+            if (!s.combinedAxis || combinedAxes.containsKey(s.unit))
+                continue;
+            var axis = new PlotYAxis();
+            axis.unit = s.unit;
+            axis.unitSymbol = "[" + s.unit.symbol + "]";
+            axis.index = axisIndex++;
+            combinedAxes.put(s.unit, axis);
+            axes.add(axis);
+        }
+        for (int i = 0; i < series.size(); i++) {
+            var s = series.get(i);
+            PlotYAxis axis;
+            if (s.combinedAxis) {
                 s.name += "[" + s.unit.symbol + "]";
-            }
-        } else {
-            int axisIndex = 0;
-            Map<Unit, PlotYAxis> combinedAxes = new HashMap<>();
-            for (var s : series) {
-                if (!s.combinedAxis || combinedAxes.containsKey(s.unit))
-                    continue;
-                var axis = new PlotYAxis();
+                axis = combinedAxes.get(s.unit);
+            } else {
+                axis = new PlotYAxis();
                 axis.unit = s.unit;
-                axis.unitSymbol = "[" + s.unit.symbol + "]";
+                axis.unitSymbol = s.name + "[" + s.unit.symbol + "]";
                 axis.index = axisIndex++;
-                combinedAxes.put(s.unit, axis);
                 axes.add(axis);
             }
-            for (int i = 0; i < series.size(); i++) {
-                var s = series.get(i);
-                PlotYAxis axis;
-                if (s.combinedAxis) {
-                    s.name += "[" + s.unit.symbol + "]";
-                    axis = combinedAxes.get(s.unit);
-                } else {
-                    axis = new PlotYAxis();
-                    axis.unit = s.unit;
-                    axis.unitSymbol = s.name + "[" + s.unit.symbol + "]";
-                    axis.index = axisIndex++;
-                    axes.add(axis);
-                }
 
-                s.yAxisIndex = axis.index;
-            }
+            s.yAxisIndex = axis.index;
         }
 
         axes.stream().skip(axes.size() / 2).forEach(a -> a.isRight = true);
