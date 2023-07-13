@@ -118,18 +118,12 @@ function dischargeTime(state: State, inputVoltage: number, outputVoltage: number
 function calc(state: State, inputVoltage: number, outputVoltage: number) {
     const idleFraction = state.idlePercentage / 100;
     const peakCurrent = state.peakCurrent.value;
-    const inductance = state.inductance.value;
 
     const dischargeTimeValue = dischargeTime(state, inputVoltage, outputVoltage);
     const minCycleTime = (chargeTime(state, inputVoltage) + dischargeTimeValue) / (1-idleFraction);
     const maxSwitchingFrequency = 1 / minCycleTime;
     const maxCurrent = peakCurrent * dischargeTimeValue / (2 * minCycleTime);
     return { dischargeTime: dischargeTimeValue, maxSwitchingFrequency, maxCurrent, maxPower: maxCurrent * outputVoltage };
-}
-
-function calcForFrequency(state: State, frequency: number){
-    const current=state.peakCurrent.value*dischargeTime(state,state.in.value, state.out.value)/(2*1/frequency);
-    return {current};
 }
 
 function range(start: number, stop: number, count: number) {
@@ -158,7 +152,7 @@ export function Cot() {
         outMin: { value: 5, unit: 'V' },
         outMax: { value: 20, unit: 'V' },
     }, (stateAccess) => {
-        const [state, setState] = stateAccess;
+        const [state] = stateAccess;
         const inVoltages = range(state.inMin.value, state.inMax.value, state.inSteps);
         const outputVoltages = range(state.outMin.value, state.outMax.value, 200);
         const xAxisOutputVoltageProps = {
@@ -216,7 +210,6 @@ export function Cot() {
             },
         ]
 
-        const singlePointResult=calc(state, state.in.value, state.out.value);
         return <div className="toolContainer">
             <div className="row">
                 <InductanceInput stateAccess={stateAccess} k="inductance" className="col" />
@@ -233,20 +226,6 @@ export function Cot() {
                 <VoltageInput stateAccess={stateAccess} k="outMax" className="col" />
             </div>
             <GraphSwitcher graphs={graphs}/>
-{/*             
-            <h1> Single Operation Point</h1>
-            <div className="row">
-                <VoltageInput stateAccess={stateAccess} k="in" className="col" />
-                <VoltageInput stateAccess={stateAccess} k="out" className="col" />
-            </div>
-            <Graph
-            xAxisLabel="Frequency"
-            xUnits={frequencyUnits}
-            xValues={range(1, singlePointResult.maxSwitchingFrequency, 200)}
-            yAxisLabel="Output Current"
-            yUnits={currentUnits}
-            f={(frequency: number)=>calcForFrequency(state, frequency).current}
-            /> */}
             <div>
                 <button type="button" className="btn btn-secondary" onClick={stateAccess[2]}>Reset</button>
             </div >

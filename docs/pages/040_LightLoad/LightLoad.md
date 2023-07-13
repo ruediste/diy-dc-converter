@@ -18,16 +18,6 @@ The power converted in COT mode is proportional to the cycle frequency. Thus, by
 
 If the load drops to a very low level, the frequency becomes also very low. It is not practical to use a PID controller if one period lasts multiple seconds. Therefore, below a minimum frequency we switch to a mode called cycle skipping. This is essentially a form of hysteric control: The PWM frequency kept fixed. Whenever the voltage drops below the target voltage, the switching PWM signal is enabled. If it rises above the target voltage, the PWM signal is disabled.
 
-# Modes Overview
-
-This is the first converter with multiple control modes intended to operate over a wide range of output conditions. There are the following modes:
-
-- **COT:** A PID controller is used to control the PWM frequency
-- **Cycle Skipping:** For light loads, we use a fixed PWM frequency and switch the PWM output on if the output voltage exceeds ths target voltage
-- **Low Output Voltage (LOV):** If the output voltage is close to the input voltage, we try to raise the output voltage in short bursts
-
-The following sections detail each mode and the conditions that lead to mode switches.
-
 # COT
 
 In the COT mode we use a PID controller to adjust the PWM frequency to reach the target voltage at the output. A PID controller works best for linear system. That means, at all operation points, the same change of the controller output should have the same effect on the converter. In our case, we choose to control the output current $$I_\text{out}$$. For a fixed target voltage, this is equivalent to controlling the target power, and for an ohmic load it is also equivalent to controlling the output voltage. Also, the output (and load) capacitance is typically fixed. Thus the response time to a current change is independent of the output voltage.
@@ -60,10 +50,36 @@ Using the following tool, you can calculate the performance envelope of a conver
 
 <div data-tool="cot"></div>
 
-The switch from COT to cycle skipping happens as soon as the switching frequency reaches half the control frequency. When we can run a full control cycle for every switching cycle, just switching on the PWM output whenever the output voltage is below the target voltage results in good regulation.
-
 # Cycle Skipping
+To switch between COT and Cycle Skipping the control frequency used as reference. If the PWM frequency is above the control frequency, a PID controller makes most sense. If the PWM frequency is below the control frequency, the easiest way to regulate is to just enable the PWM signal as soon as the voltage is below the target voltage.
 
-Whenever the PWM signal is enabled, the starting voltage is marked. If the voltage does not increase after three switching cycles, the controller switches back to COT mode.
+The switch from COT to Cycle Skipping happens as soon as the switching frequency reaches half the control frequency. The PWM frequency in Cycle Skipping is set to the control frequency. Therefore after the switch, the PWM signal has to be enabled about half the time to keep produce the output current at the switching point. This gives some room to avoid oscillations between the two modes.
 
-# Low Output Voltage (LOV)
+Going back from Cycle Skipping to COT happens as soon as the PWM signal is enabled for at least three cycles and the output voltage drops more than two standard deviations below the target voltage.
+
+# Handling Low Output Voltages
+When the converter starts, the output voltage matches the input voltage and the fall time is theoretically infinite. To avoid that, the output voltage used for the calculations is at least 1.1 times the input voltage.
+
+# Experimental Results
+The following shows the control application at a steady state with a 12k resistor as load (1mA):
+
+![](AppSteadyState12k.png)
+
+and the corresponding wave form:
+
+![](pic_243_1.png)
+
+Switching the load between idle and a 2k resistor (6mA):
+
+![](pic_243_2.png)
+
+![](pic_243_3.png)
+
+The idle wave form:
+
+![](pic_243_4.png)
+
+Situation with 2k load:
+
+![](pic_243_5.png)
+
